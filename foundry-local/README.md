@@ -1,71 +1,148 @@
-# foundry-local README
+# Foundry Local VS Code Extension
 
-This is the README for your extension "foundry-local". After writing up a brief description, we recommend including the following sections.
+This VS Code extension integrates Foundry Local with GitHub Copilot chat, allowing users to bring their own local AI models and use them within VS Code's chat interface.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
-
-For example if there is an image subfolder under your extension project workspace:
-
-\!\[feature X\]\(images/feature-x.png\)
-
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+- **Foundry Local Integration**: Connect to your local Foundry Local instance
+- **Model Management**: Discover, load, and manage local AI models
+- **GitHub Copilot Chat Provider**: Use local models seamlessly with GitHub Copilot chat (when API becomes available)
+- **Configuration Management**: Easy setup and configuration of Foundry Local connection
+- **Status Monitoring**: Real-time monitoring of service status and model availability
+- **Token Counting**: Built-in token estimation for model usage
 
 ## Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+- VS Code version 1.101.0 or higher
+- Foundry Local instance running locally
+- Network access to your Foundry Local service
 
 ## Extension Settings
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
 This extension contributes the following settings:
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+- `foundryLocal.endpoint`: Foundry Local API endpoint URL (default: `http://localhost`)
+- `foundryLocal.port`: Foundry Local API port (default: `8000`)
+- `foundryLocal.apiKey`: API key for Foundry Local (if required)
+- `foundryLocal.timeout`: Request timeout in milliseconds (default: `30000`)
+- `foundryLocal.maxRetries`: Maximum number of request retries (default: `3`)
+- `foundryLocal.defaultModel`: Default model ID to use for chat
+- `foundryLocal.autoStart`: Automatically start service monitoring on extension activation
+- `foundryLocal.logLevel`: Log level for debugging (`debug`, `info`, `warn`, `error`)
 
-## Known Issues
+## Commands
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+The extension provides the following commands:
+
+- `Foundry Local: Refresh Models` - Refresh the list of available models
+- `Foundry Local: Select Model` - Select the default model for chat
+- `Foundry Local: Show Status` - Show current service status and model information
+- `Foundry Local: Open Settings` - Open extension settings
+
+## Getting Started
+
+1. **Install the extension** from the VS Code marketplace
+2. **Start Foundry Local** on your local machine (default: `http://localhost:8000`)
+3. **Configure the extension** via VS Code settings if your Foundry Local runs on a different endpoint
+4. **Load models** in Foundry Local
+5. **Refresh models** using the command palette (`Cmd/Ctrl+Shift+P` → "Foundry Local: Refresh Models")
+6. **Select a default model** using the command palette ("Foundry Local: Select Model")
+
+## Configuration
+
+### Basic Setup
+
+1. Open VS Code Settings (`Cmd/Ctrl+,`)
+2. Search for "foundry local"
+3. Configure your Foundry Local endpoint and port
+4. Set your preferred default model
+
+### Advanced Configuration
+
+For advanced users, you can configure additional settings like timeout, retry behavior, and logging level through the settings interface.
+
+## Architecture
+
+The extension is built with the following components:
+
+- **Chat Provider**: Implements the proposed VS Code Language Model API for seamless integration
+- **Model Discovery**: Manages model discovery and lifecycle
+- **Foundry Local Service**: Handles API communication with Foundry Local
+- **Configuration Manager**: Manages extension settings and validation
+- **Utilities**: Token counting, logging, and helper functions
+
+## API Integration
+
+This extension is designed to integrate with the proposed VS Code Language Model API (`LanguageModelChatProvider2`). When this API becomes stable and available, the extension will automatically register as a chat provider for GitHub Copilot.
+
+Currently, the extension provides:
+- Model management and discovery
+- Service status monitoring
+- Configuration interface
+- Foundry Local API integration
+
+## Development
+
+### Building from Source
+
+```bash
+git clone https://github.com/pierceboggan/byok-foundry-local.git
+cd byok-foundry-local/foundry-local
+npm install
+npm run compile
+```
+
+### Running Tests
+
+```bash
+npm test
+```
+
+### Debugging
+
+1. Open the project in VS Code
+2. Press `F5` to start debugging
+3. A new Extension Development Host window will open
+4. Test the extension in the new window
+
+## Troubleshooting
+
+### Common Issues
+
+**Cannot connect to Foundry Local**
+- Ensure Foundry Local is running on the configured endpoint
+- Check firewall settings
+- Verify the endpoint URL and port in settings
+
+**No models available**
+- Ensure models are loaded in Foundry Local
+- Use "Foundry Local: Refresh Models" command
+- Check the extension logs for detailed error information
+
+**Performance issues**
+- Adjust timeout settings for slower models
+- Monitor token usage and model context limits
+- Check Foundry Local resource usage
+
+### Viewing Logs
+
+Use the "Foundry Local: Show Status" command and click "View Logs" to see detailed logging information.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Release Notes
 
-Users appreciate release notes as you update your extension.
+### 0.0.1
 
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+Initial release of Foundry Local VS Code extension featuring:
+- Foundry Local service integration
+- Model discovery and management
+- Configuration interface
+- Status monitoring
+- Foundation for GitHub Copilot chat integration
