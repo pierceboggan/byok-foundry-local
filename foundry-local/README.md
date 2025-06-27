@@ -1,71 +1,197 @@
-# foundry-local README
+# Foundry Local Extension - Language Model Chat Provider Implementation
 
-This is the README for your extension "foundry-local". After writing up a brief description, we recommend including the following sections.
+## Overview
 
-## Features
+This extension implements a Language Model Chat Provider for VS Code that integrates Foundry Local models with VS Code's Chat and Language Model APIs. The implementation enables Foundry Local models to appear in VS Code's "Manage Models" dropdown and be used by other extensions.
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+## Key Features
 
-For example if there is an image subfolder under your extension project workspace:
+### 1. Language Model Chat Provider Integration
+- **`FoundryLanguageModelChatProvider`** - Implements VS Code's `LanguageModelChatProvider2` interface
+- **Model Discovery** - Automatically discovers available Foundry Local models
+- **VS Code Integration** - Models appear in "Manage Models" dropdown with proper metadata
+- **Token Counting** - Provides accurate token usage estimation
 
-\!\[feature X\]\(images/feature-x.png\)
+### 2. Backward Compatible Chat Participant
+- **`@foundry-local` participant** - Direct chat interaction in VS Code Chat
+- **Streaming responses** - Real-time response streaming from Foundry Local
+- **Context aware** - Maintains conversation history
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+### 3. Robust Service Architecture
+- **ModelDiscovery** - Handles model discovery and caching
+- **FoundryLocalService** - Manages communication with Foundry Local API
+- **ConfigurationManager** - Centralized configuration management
+- **Logger** - Comprehensive logging with multiple levels
 
-## Requirements
+## Installation & Setup
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+### Prerequisites
+- VS Code 1.101.0 or later
+- Foundry Local running locally (default: http://localhost:8080)
 
-## Extension Settings
+### Configuration
+The extension can be configured through VS Code settings (`foundryLocal.*`):
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+```json
+{
+  "foundryLocal.endpoint": "http://localhost",
+  "foundryLocal.port": 8080,
+  "foundryLocal.timeout": 30000,
+  "foundryLocal.maxRetries": 3,
+  "foundryLocal.defaultModel": "your-model-id",
+  "foundryLocal.logLevel": "info"
+}
+```
 
-For example:
+## Usage
 
-This extension contributes the following settings:
+### 1. Using Language Model API
+Once installed, Foundry Local models will appear in:
+- VS Code's "Manage Models" dropdown
+- Language model selection interfaces
+- Other extensions that use VS Code's Language Model API
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+### 2. Using Chat Participant
+In VS Code Chat, use the `@foundry-local` participant:
+```
+@foundry-local What is TypeScript?
+```
 
-## Known Issues
+### 3. Commands
+The extension provides several commands accessible via Command Palette:
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+- **Foundry Local: Refresh Models** - Manually refresh model list
+- **Foundry Local: Select Model** - Set default model
+- **Foundry Local: Load Model** - Load a specific model
+- **Foundry Local: Unload Model** - Unload a specific model
+- **Foundry Local: Show Status** - Display service status
+- **Foundry Local: Open Settings** - Open extension settings
 
-## Release Notes
+## API Implementation Details
 
-Users appreciate release notes as you update your extension.
+### Language Model Chat Provider Registration
+```typescript
+// Registers with VS Code's Language Model API
+vscode.lm.registerChatModelProvider('foundry-local', provider, metadata);
+```
 
-### 1.0.0
+### Provider Interface Implementation
+```typescript
+interface LanguageModelChatProvider2 {
+  prepareLanguageModelChat(options, token): Promise<ModelInfo[]>
+  provideLanguageModelChatResponse(model, messages, options, progress, token): Promise<void>
+  provideTokenCount(model, text, token): Promise<number>
+}
+```
 
-Initial release of ...
+### Metadata Configuration
+```typescript
+const metadata = {
+  vendor: 'Foundry Local',
+  name: 'Foundry Local Models',
+  family: 'foundry-local',
+  isUserSelectable: true,
+  capabilities: { vision: false, toolCalling: false },
+  category: { label: 'Local Models', order: 10 }
+};
+```
 
-### 1.0.1
+## Development
 
-Fixed issue #.
+### Building the Extension
+```bash
+npm install
+npm run compile
+npm run lint
+```
 
-### 1.1.0
+### Testing
+```bash
+npm test  # Requires VS Code environment
+```
 
-Added features X, Y, and Z.
+### Project Structure
+```
+src/
+├── extension.ts                     # Main extension entry point
+├── types/foundryLocal.ts           # TypeScript interfaces
+├── utils/
+│   ├── logger.ts                   # Logging utility
+│   └── tokenCounter.ts             # Token estimation
+├── services/
+│   ├── configurationManager.ts    # Settings management
+│   └── foundryLocalService.ts     # Foundry Local API client
+└── providers/
+    ├── modelDiscovery.ts           # Model discovery service
+    ├── foundryLocalChatProvider.ts # Chat participant
+    └── foundryLanguageModelChatProvider.ts # Language Model API
+```
+
+## Proposed API Usage
+
+This extension uses VS Code's proposed Chat Provider API. The `vscode.proposed.chatProvider.d.ts` file contains the necessary type definitions for:
+
+- `LanguageModelChatProvider2` interface
+- `LanguageModelChatInformation` metadata
+- `ChatResponseProviderMetadata` configuration
+- `lm.registerChatModelProvider` function
+
+## Error Handling
+
+The implementation includes comprehensive error handling:
+- **API Availability Checks** - Graceful fallback if proposed APIs are not available
+- **Network Error Handling** - Retry logic with exponential backoff
+- **Model Loading Validation** - Checks model availability before use
+- **Type Safety** - Proper type assertions for proposed API compatibility
+
+## Logging
+
+Comprehensive logging is available at multiple levels:
+- **DEBUG** - Detailed execution information
+- **INFO** - General operational messages
+- **WARN** - Warning conditions
+- **ERROR** - Error conditions with stack traces
+
+Access logs via the "Foundry Local" output channel in VS Code.
+
+## Contributing
+
+When contributing to this extension:
+
+1. Ensure TypeScript compilation passes: `npm run compile`
+2. Run linting: `npm run lint` 
+3. Test with actual VS Code environment
+4. Maintain backward compatibility with chat participant
+5. Update this documentation for new features
+
+## Troubleshooting
+
+### Models Not Appearing in VS Code
+1. Check that Foundry Local is running and accessible
+2. Verify extension is loaded: Check VS Code Extensions view
+3. Refresh models: Use "Foundry Local: Refresh Models" command
+4. Check logs: Open "Foundry Local" output channel
+
+### Chat Participant Not Working
+1. Ensure at least one model is loaded in Foundry Local
+2. Check default model configuration
+3. Verify Foundry Local connectivity
+4. Review error messages in chat response
+
+### Configuration Issues
+1. Validate settings using "Foundry Local: Show Status" command
+2. Reset to defaults if needed
+3. Check Foundry Local endpoint accessibility
+4. Review timeout and retry settings
 
 ---
 
-## Following extension guidelines
+## Extension Guidelines
 
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
+This extension follows VS Code's [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines) and implements best practices for:
 
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+- Language Model API integration
+- Chat participant implementation
+- Configuration management
+- Error handling and logging
+- TypeScript development
