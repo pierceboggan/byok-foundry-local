@@ -3,6 +3,7 @@ import { FoundryLocalModel, FoundryChatMessage } from '../types/foundryLocal';
 import { FoundryLocalService } from '../services/foundryLocalService';
 import { ModelDiscovery } from './modelDiscovery';
 import { Logger } from '../utils/logger';
+import { TokenCounter } from '../utils/tokenCounter';
 
 /**
  * A chat participant implementation for Foundry Local
@@ -208,12 +209,148 @@ export class FoundryLocalChatProvider {
 }
 
 /**
- * Factory class for creating and managing the chat participant
+ * Language Model Chat Provider implementation for VS Code Chat Models Integration
+ */
+export class FoundryLocalLanguageModelProvider implements vscode.LanguageModelChatProvider {
+    private logger = Logger.getInstance();
+    private foundryService = FoundryLocalService.getInstance();
+    private modelDiscovery = ModelDiscovery.getInstance();
+
+    constructor() {
+        this.logger.info('Creating Foundry Local language model provider');
+    }
+
+    /**
+     * Provides language model response for a given set of messages
+     */
+    async provideLanguageModelResponse(
+        messages: Array<vscode.LanguageModelChatMessage>,
+        options: vscode.LanguageModelChatRequestOptions,
+        extensionId: string,
+        progress: vscode.Progress<vscode.ChatResponseFragment2>,
+        token: vscode.CancellationToken
+    ): Promise<any> {
+        this.logger.debug('Providing language model response', { 
+            messageCount: messages.length, 
+            extensionId,
+            modelId: options.modelOptions?.modelId
+        });
+
+        try {
+            // Find the specified model
+            const modelId = options.modelOptions?.modelId;
+            if (!modelId) {
+                throw new Error('No model specified in request options');
+            }
+
+            const model = this.modelDiscovery.getModel(modelId);
+            if (!model) {
+                throw new Error(`Model ${modelId} not found`);
+            }
+
+            if (!model.isLoaded) {
+                throw new Error(`Model ${model.name} is not loaded`);
+            }
+
+            // Convert VS Code messages to Foundry Local format
+            const foundryMessages = this.convertMessagesToFoundryFormat(messages);
+
+            // Create the chat request
+            const chatRequest = {
+                model: model.id,
+                messages: foundryMessages,
+                stream: true,
+                max_tokens: model.maxTokens
+            };
+
+            this.logger.debug('Sending streaming chat request to Foundry Local');
+
+            // Get the streaming response
+            const streamGenerator = this.foundryService.sendStreamingChatRequest(chatRequest);
+
+            // Stream the response back to VS Code
+            let index = 0;
+            for await (const chunk of streamGenerator) {
+                if (token.isCancellationRequested) {
+                    this.logger.debug('Language model request cancelled');
+                    return;
+                }
+
+                // Extract text content from the chunk
+                if (chunk.choices && chunk.choices.length > 0) {
+                    const choice = chunk.choices[0];
+                    if (choice.delta && choice.delta.content) {
+                        progress.report({
+                            index: index++,
+                            part: new vscode.LanguageModelTextPart(choice.delta.content)
+                        });
+                    }
+                }
+            }
+
+            this.logger.debug('Language model response completed');
+        } catch (error) {
+            this.logger.error('Error in language model response', error as Error);
+            throw error;
+        }
+    }
+
+    /**
+     * Provides token count for text or message
+     */
+    async provideTokenCount(
+        text: string | vscode.LanguageModelChatMessage,
+        token: vscode.CancellationToken
+    ): Promise<number> {
+        if (typeof text === 'string') {
+            return TokenCounter.estimateTokens(text);
+        } else {
+            // Handle LanguageModelChatMessage
+            let content = '';
+            if (Array.isArray(text.content)) {
+                const textParts = text.content.filter(part => part instanceof vscode.LanguageModelTextPart) as vscode.LanguageModelTextPart[];
+                content = textParts.map(part => part.value).join('\n');
+            } else {
+                content = text.content as string;
+            }
+            return TokenCounter.estimateTokens(content);
+        }
+    }
+
+    /**
+     * Convert VS Code chat messages to Foundry Local format
+     */
+    private convertMessagesToFoundryFormat(messages: vscode.LanguageModelChatMessage[]): FoundryChatMessage[] {
+        return messages.map(message => {
+            // Extract text content from message content
+            let content = '';
+            
+            if (Array.isArray(message.content)) {
+                const textParts = message.content.filter(part => part instanceof vscode.LanguageModelTextPart) as vscode.LanguageModelTextPart[];
+                content = textParts.map(part => part.value).join('\n');
+            } else {
+                content = message.content as string;
+            }
+
+            return {
+                role: message.role === vscode.LanguageModelChatMessageRole.User ? 'user' : 'assistant',
+                content,
+                name: message.name
+            };
+        });
+    }
+}
+
+/**
+ * Factory class for creating and managing the chat participant and language model provider
  */
 export class FoundryLocalChatProviderFactory {
     private static instance: FoundryLocalChatProviderFactory;
     private logger = Logger.getInstance();
     private chatProvider: FoundryLocalChatProvider | undefined;
+    private languageModelProvider: FoundryLocalLanguageModelProvider | undefined;
+    private modelDiscovery = ModelDiscovery.getInstance();
+    private registeredModels = new Map<string, vscode.Disposable>();
 
     private constructor() {}
 
@@ -236,13 +373,132 @@ export class FoundryLocalChatProviderFactory {
     }
 
     /**
-     * Dispose the chat provider
+     * Creates or gets the language model provider
+     */
+    public getLanguageModelProvider(): FoundryLocalLanguageModelProvider {
+        if (!this.languageModelProvider) {
+            this.languageModelProvider = new FoundryLocalLanguageModelProvider();
+            this.logger.info('Created Foundry Local language model provider');
+        }
+        return this.languageModelProvider;
+    }
+
+    /**
+     * Register all available models as language model providers
+     */
+    public registerModelProviders(): vscode.Disposable[] {
+        const disposables: vscode.Disposable[] = [];
+        const models = this.modelDiscovery.getModels();
+        
+        for (const model of models) {
+            const disposable = this.registerModelProvider(model);
+            if (disposable) {
+                disposables.push(disposable);
+            }
+        }
+
+        this.logger.info(`Registered ${disposables.length} language model providers`);
+        return disposables;
+    }
+
+    /**
+     * Register a single model as a language model provider
+     */
+    private registerModelProvider(model: FoundryLocalModel): vscode.Disposable | undefined {
+        try {
+            // Skip if already registered
+            if (this.registeredModels.has(model.id)) {
+                return undefined;
+            }
+
+            const provider = this.getLanguageModelProvider();
+            
+            // Create metadata for this specific model
+            const metadata: vscode.ChatResponseProviderMetadata = {
+                vendor: 'Foundry Local',
+                name: model.name,
+                family: model.provider || 'foundry-local',
+                description: model.description || `Local AI model: ${model.name}`,
+                version: '1.0.0',
+                maxInputTokens: model.contextLength || model.maxTokens || 4096,
+                maxOutputTokens: model.maxTokens || 2048,
+                isUserSelectable: true,
+                capabilities: {
+                    vision: model.capabilities.vision,
+                    toolCalling: model.capabilities.toolCalling
+                },
+                category: {
+                    label: 'Foundry Local',
+                    order: 100
+                }
+            };
+
+            // Register with VS Code
+            const disposable = vscode.lm.registerChatModelProvider(
+                model.id,
+                provider,
+                metadata
+            );
+
+            this.registeredModels.set(model.id, disposable);
+            this.logger.debug(`Registered language model provider for model: ${model.name} (${model.id})`);
+            
+            return disposable;
+        } catch (error) {
+            this.logger.error(`Failed to register language model provider for model ${model.name}`, error as Error);
+            return undefined;
+        }
+    }
+
+    /**
+     * Unregister a model provider
+     */
+    public unregisterModelProvider(modelId: string): void {
+        const disposable = this.registeredModels.get(modelId);
+        if (disposable) {
+            disposable.dispose();
+            this.registeredModels.delete(modelId);
+            this.logger.debug(`Unregistered language model provider for model: ${modelId}`);
+        }
+    }
+
+    /**
+     * Refresh model providers based on current models
+     */
+    public refreshModelProviders(): vscode.Disposable[] {
+        // Unregister all existing providers
+        this.disposeModelProviders();
+        
+        // Register current models
+        return this.registerModelProviders();
+    }
+
+    /**
+     * Dispose all model providers
+     */
+    private disposeModelProviders(): void {
+        for (const [modelId, disposable] of this.registeredModels.entries()) {
+            disposable.dispose();
+        }
+        this.registeredModels.clear();
+        this.logger.debug('Disposed all language model providers');
+    }
+
+    /**
+     * Dispose the chat provider and language model providers
      */
     public dispose(): void {
         if (this.chatProvider) {
             this.chatProvider.dispose();
             this.chatProvider = undefined;
             this.logger.info('Disposed Foundry Local chat provider');
+        }
+
+        this.disposeModelProviders();
+        
+        if (this.languageModelProvider) {
+            this.languageModelProvider = undefined;
+            this.logger.info('Disposed Foundry Local language model provider');
         }
     }
 }

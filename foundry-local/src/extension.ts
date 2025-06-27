@@ -16,6 +16,7 @@ let configManager: ConfigurationManager;
 let foundryService: FoundryLocalService;
 let modelDiscovery: ModelDiscovery;
 let chatProviderFactory: FoundryLocalChatProviderFactory;
+let languageModelProviderDisposables: vscode.Disposable[] = [];
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -54,8 +55,11 @@ export function activate(context: vscode.ExtensionContext) {
 	// Register chat provider if the API is available
 	registerChatProvider(context);
 
+	// Register language model providers
+	registerLanguageModelProviders(context);
+
 	// Set up model discovery event handlers
-	setupModelDiscoveryEvents();
+	setupModelDiscoveryEvents(context);
 
 	// Auto-start if configured
 	if (configManager.getAutoStart()) {
@@ -203,9 +207,51 @@ function registerChatProvider(context: vscode.ExtensionContext) {
 }
 
 /**
+ * Registers language model providers for discovered models
+ */
+function registerLanguageModelProviders(context: vscode.ExtensionContext) {
+	try {
+		logger.info('Registering Foundry Local language model providers');
+		
+		// Register current models
+		const disposables = chatProviderFactory.registerModelProviders();
+		
+		// Add to context subscriptions
+		context.subscriptions.push(...disposables);
+		languageModelProviderDisposables.push(...disposables);
+		
+		logger.info('Foundry Local language model providers registered successfully');
+	} catch (error) {
+		logger.error('Failed to register language model providers', error as Error);
+	}
+}
+
+/**
+ * Refreshes language model providers when models change
+ */
+function refreshLanguageModelProviders(context: vscode.ExtensionContext) {
+	try {
+		logger.info('Refreshing Foundry Local language model providers');
+		
+		// Dispose existing providers (they're already in context.subscriptions so will be cleaned up)
+		languageModelProviderDisposables = [];
+		
+		// Register updated models
+		const disposables = chatProviderFactory.refreshModelProviders();
+		
+		// Add to context subscriptions
+		context.subscriptions.push(...disposables);
+		languageModelProviderDisposables.push(...disposables);
+		
+		logger.info('Foundry Local language model providers refreshed successfully');
+	} catch (error) {
+		logger.error('Failed to refresh language model providers', error as Error);
+	}
+}
+/**
  * Sets up event handlers for model discovery
  */
-function setupModelDiscoveryEvents() {
+function setupModelDiscoveryEvents(context: vscode.ExtensionContext) {
 	// Listen for model changes
 	modelDiscovery.onModelsChanged(models => {
 		logger.info(`Models updated: ${models.length} models available`);
@@ -225,6 +271,9 @@ function setupModelDiscoveryEvents() {
 				}
 			});
 		}
+
+		// Refresh language model providers when models change
+		refreshLanguageModelProviders(context);
 	});
 }
 
