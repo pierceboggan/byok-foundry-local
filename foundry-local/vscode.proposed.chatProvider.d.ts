@@ -128,9 +128,9 @@ declare module 'vscode' {
 		// NOT cacheable (between reloads)
 		prepareLanguageModelChat(options: { silent: boolean }, token: CancellationToken): ProviderResult<T[]>;
 
-		provideLanguageModelChatResponse(model: T, messages: Array<LanguageModelChatMessage | LanguageModelChatMessage2>, options: LanguageModelChatRequestHandleOptions, progress: Progress<LanguageModelTextPart | LanguageModelToolCallPart>, token: CancellationToken): Thenable<any>;
+		provideLanguageModelChatResponse(model: T, messages: Array<LanguageModelChatMessage>, options: LanguageModelChatRequestHandleOptions, progress: Progress<LanguageModelTextPart | LanguageModelToolCallPart>, token: CancellationToken): Thenable<any>;
 
-		provideTokenCount(model: T, text: string | LanguageModelChatMessage | LanguageModelChatMessage2, token: CancellationToken): Thenable<number>;
+		provideTokenCount(model: T, text: string | LanguageModelChatMessage, token: CancellationToken): Thenable<number>;
 	}
 
 	export namespace lm {
@@ -157,9 +157,9 @@ declare module 'vscode' {
 
 		// TODO@API
 		// have dedicated options, don't reuse the LanguageModelChatRequestOptions so that consumer and provider part of the API can develop independently
-		provideLanguageModelResponse(messages: Array<LanguageModelChatMessage | LanguageModelChatMessage2>, options: LanguageModelChatRequestOptions, extensionId: string, progress: Progress<ChatResponseFragment2>, token: CancellationToken): Thenable<any>;
+		provideLanguageModelResponse(messages: Array<LanguageModelChatMessage>, options: LanguageModelChatRequestOptions, extensionId: string, progress: Progress<ChatResponseFragment2>, token: CancellationToken): Thenable<any>;
 
-		provideTokenCount(text: string | LanguageModelChatMessage | LanguageModelChatMessage2, token: CancellationToken): Thenable<number>;
+		provideTokenCount(text: string | LanguageModelChatMessage, token: CancellationToken): Thenable<number>;
 	}
 
 	export type ChatResponseProvider = LanguageModelChatProvider;
