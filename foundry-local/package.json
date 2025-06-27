@@ -14,6 +14,9 @@
   "activationEvents": [
     "onStartupFinished"
   ],
+  "enabledApiProposals": [
+    "chatProvider"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
