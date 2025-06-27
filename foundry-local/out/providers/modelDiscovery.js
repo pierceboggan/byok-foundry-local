@@ -98,8 +98,9 @@ class ModelDiscovery {
      */
     getModelsWithCapabilities(capabilities) {
         return this.models.filter(model => {
-            if (!model.capabilities)
+            if (!model.capabilities) {
                 return false;
+            }
             return capabilities.every(capability => {
                 switch (capability) {
                     case 'chat':

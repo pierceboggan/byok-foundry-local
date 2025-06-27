@@ -32,8 +32,7 @@ export class FoundryLocalService {
             
             // Make a simple health check request
             const response = await this.makeRequest('/health', {
-                method: 'GET',
-                timeout: config.timeout
+                method: 'GET'
             });
 
             if (response.ok) {
@@ -243,7 +242,9 @@ export class FoundryLocalService {
             try {
                 while (true) {
                     const { done, value } = await reader.read();
-                    if (done) break;
+                    if (done) {
+                        break;
+                    }
 
                     buffer += decoder.decode(value, { stream: true });
                     const lines = buffer.split('\n');
@@ -293,7 +294,6 @@ export class FoundryLocalService {
         const url = `${endpoint}${path}`;
 
         const defaultOptions: RequestInit = {
-            timeout: config.timeout,
             ...options
         };
 
@@ -301,7 +301,16 @@ export class FoundryLocalService {
         let lastError: Error | null = null;
         for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
             try {
-                const response = await fetch(url, defaultOptions);
+                // Implement timeout using AbortController
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), config.timeout);
+                
+                const response = await fetch(url, {
+                    ...defaultOptions,
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
                 return response;
             } catch (error) {
                 lastError = error as Error;

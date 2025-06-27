@@ -49,23 +49,6 @@ declare module 'vscode' {
 		readonly maxOutputTokens: number;
 	}
 
-	/**
-	 * Represents a large language model that accepts ChatML messages and produces a streaming response
-	*/
-	export interface LanguageModelChatProvider {
-
-		// TODO@API remove or keep proposed?
-		onDidReceiveLanguageModelResponse2?: Event<{ readonly extensionId: string; readonly participant?: string; readonly tokenCount?: number }>;
-
-		// TODO@API
-		// have dedicated options, don't reuse the LanguageModelChatRequestOptions so that consumer and provider part of the API can develop independently
-		provideLanguageModelResponse(messages: Array<LanguageModelChatMessage>, options: LanguageModelChatRequestOptions, extensionId: string, progress: Progress<ChatResponseFragment2>, token: CancellationToken): Thenable<any>;
-
-		provideTokenCount(text: string | LanguageModelChatMessage, token: CancellationToken): Thenable<number>;
-	}
-
-	export type ChatResponseProvider = LanguageModelChatProvider;
-
 	// TODO@API name scheme
 	export interface LanguageModelChatRequestHandleOptions {
 		/**
@@ -82,26 +65,6 @@ declare module 'vscode' {
 		 * Do not stream the response, return it as a single result.
 		 */
 		readonly stream?: boolean;
-
-		/**
-		 * A set of tools that are available to the language model. The language model can choose to call these tools
-		 * as part of its response. When tools are called, they result in a {@link LanguageModelToolCallPart} being added to the response.
-		 *
-		 * *Note* that the language model is not guaranteed to call any tools that are provided. The language model may also call
-		 * tools multiple times or in a different order than they are provided.
-		 *
-		 * When a tool is called, the extension host will automatically call the tool's implementation and provide the result
-		 * back to the language model, which can then use the result to continue its response.
-		 *
-		 * Then, the tool result can be provided to the LLM by creating an Assistant-type {@link LanguageModelChatMessage} with a
-		 * {@link LanguageModelToolCallPart}, followed by a User-type message with a {@link LanguageModelToolResultPart}.
-		 */
-		tools?: LanguageModelChatTool[];
-
-		/**
-		 * 	The tool-selecting mode to use. {@link LanguageModelChatToolMode.Auto} by default.
-		 */
-		toolMode?: LanguageModelChatToolMode;
 	}
 
 	export interface LanguageModelChatProvider2<T extends LanguageModelChatInformation = LanguageModelChatInformation> {
@@ -112,14 +75,9 @@ declare module 'vscode' {
 		// NOT cacheable (between reloads)
 		prepareLanguageModelChat(options: { silent: boolean }, token: CancellationToken): ProviderResult<T[]>;
 
-		provideLanguageModelChatResponse(model: T, messages: Array<LanguageModelChatMessage>, options: LanguageModelChatRequestHandleOptions, progress: Progress<LanguageModelTextPart | LanguageModelToolCallPart>, token: CancellationToken): Thenable<any>;
+		provideLanguageModelChatResponse(model: T, messages: Array<LanguageModelChatMessage>, options: LanguageModelChatRequestHandleOptions, progress: Progress<LanguageModelTextPart>, token: CancellationToken): Thenable<any>;
 
 		provideTokenCount(model: T, text: string | LanguageModelChatMessage, token: CancellationToken): Thenable<number>;
-	}
-
-	export interface ChatResponseFragment2 {
-		index: number;
-		part: LanguageModelTextPart | LanguageModelToolCallPart;
 	}
 
 	export interface ChatResponseProviderMetadata {
@@ -169,15 +127,8 @@ declare module 'vscode' {
 
 		readonly capabilities?: {
 			readonly vision?: boolean;
-
-			// TODO@API should be `boolean | number` so extensions can express how many tools they support
 			readonly toolCalling?: boolean;
-
-			// TODO@API WHY is agentMode a capability? This seems wrong?
 			readonly agentMode?: boolean;
-
-			// TODO@API support prompt TSX style messages
-			// readonly promptTsx?:boolean
 		};
 
 		/**
@@ -194,7 +145,7 @@ declare module 'vscode' {
 	}
 
 	export namespace lm {
-		export function registerChatModelProvider(id: string, provider: LanguageModelChatProvider, metadata: ChatResponseProviderMetadata): Disposable;
+		export function registerChatModelProvider(id: string, provider: any, metadata: ChatResponseProviderMetadata): Disposable;
 	}
 
 }

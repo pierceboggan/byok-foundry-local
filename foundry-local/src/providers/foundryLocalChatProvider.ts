@@ -138,7 +138,7 @@ export class FoundryLocalChatProvider {
         try {
             // Convert VS Code messages to Foundry messages
             const foundryMessages: FoundryChatMessage[] = messages.map(msg => ({
-                role: msg.role as 'user' | 'assistant' | 'system',
+                role: (msg.role as unknown) as 'user' | 'assistant' | 'system',
                 content: typeof msg.content === 'string' ? msg.content : msg.content.map(part => {
                     if (part instanceof vscode.LanguageModelTextPart) {
                         return part.value;

@@ -27,8 +27,7 @@ class FoundryLocalService {
             this.logger.debug(`Checking Foundry Local status at ${endpoint}`);
             // Make a simple health check request
             const response = await this.makeRequest('/health', {
-                method: 'GET',
-                timeout: config.timeout
+                method: 'GET'
             });
             if (response.ok) {
                 const data = await response.json();
@@ -212,8 +211,9 @@ class FoundryLocalService {
             try {
                 while (true) {
                     const { done, value } = await reader.read();
-                    if (done)
+                    if (done) {
                         break;
+                    }
                     buffer += decoder.decode(value, { stream: true });
                     const lines = buffer.split('\n');
                     buffer = lines.pop() || '';
@@ -260,14 +260,20 @@ class FoundryLocalService {
         const endpoint = this.configManager.getEndpointUrl();
         const url = `${endpoint}${path}`;
         const defaultOptions = {
-            timeout: config.timeout,
             ...options
         };
         // Add retry logic
         let lastError = null;
         for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
             try {
-                const response = await fetch(url, defaultOptions);
+                // Implement timeout using AbortController
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), config.timeout);
+                const response = await fetch(url, {
+                    ...defaultOptions,
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
                 return response;
             }
             catch (error) {

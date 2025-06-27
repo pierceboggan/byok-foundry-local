@@ -233,15 +233,21 @@ class FoundryLanguageModelChatProviderFactory {
                     order: 10
                 }
             };
-            // Register with VS Code's Language Model API
+            // Check if the API is available
+            if (!vscode.lm || !vscode.lm.registerChatModelProvider) {
+                this.logger.warn('Language Model API not available, skipping registration');
+                return vscode.Disposable.from();
+            }
+            // Register with VS Code's Language Model API using type assertion
             this.registration = vscode.lm.registerChatModelProvider('foundry-local', this.provider, // Type assertion needed due to API version differences
             metadata);
             this.logger.info('Successfully registered Foundry Language Model Chat Provider');
-            return this.registration;
+            return this.registration || vscode.Disposable.from();
         }
         catch (error) {
             this.logger.error('Failed to register Language Model Chat Provider', error);
-            throw error;
+            // Return empty disposable instead of throwing to avoid breaking extension activation
+            return vscode.Disposable.from();
         }
     }
     /**

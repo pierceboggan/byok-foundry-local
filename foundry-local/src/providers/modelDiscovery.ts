@@ -74,7 +74,9 @@ export class ModelDiscovery {
      */
     public getModelsWithCapabilities(capabilities: string[]): FoundryLocalModel[] {
         return this.models.filter(model => {
-            if (!model.capabilities) return false;
+            if (!model.capabilities) {
+                return false;
+            }
             return capabilities.every(capability => {
                 switch (capability) {
                     case 'chat':

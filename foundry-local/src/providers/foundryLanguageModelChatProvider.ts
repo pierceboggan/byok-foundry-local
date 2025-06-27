@@ -9,7 +9,7 @@ import { Logger } from '../utils/logger';
  * Language Model Chat Provider for VS Code's Language Model API
  * This makes Foundry Local models appear in VS Code's "Manage Models" dropdown
  */
-export class FoundryLanguageModelChatProvider implements vscode.LanguageModelChatProvider2<FoundryLanguageModelChatInformation> {
+export class FoundryLanguageModelChatProvider {
     private logger = Logger.getInstance();
     private foundryService = FoundryLocalService.getInstance();
     private modelDiscovery = ModelDiscovery.getInstance();
@@ -78,7 +78,7 @@ export class FoundryLanguageModelChatProvider implements vscode.LanguageModelCha
         model: FoundryLanguageModelChatInformation,
         messages: Array<vscode.LanguageModelChatMessage>,
         options: vscode.LanguageModelChatRequestHandleOptions,
-        progress: vscode.Progress<vscode.LanguageModelTextPart | vscode.LanguageModelToolCallPart>,
+        progress: vscode.Progress<vscode.LanguageModelTextPart>,
         token: vscode.CancellationToken
     ): Promise<any> {
         this.logger.debug('Providing language model chat response', {
@@ -96,7 +96,7 @@ export class FoundryLanguageModelChatProvider implements vscode.LanguageModelCha
 
             // Convert VS Code messages to Foundry messages
             const foundryMessages: FoundryChatMessage[] = messages.map(msg => ({
-                role: msg.role as 'user' | 'assistant' | 'system',
+                role: (msg.role as unknown) as 'user' | 'assistant' | 'system',
                 content: this.extractMessageContent(msg)
             }));
 
@@ -239,18 +239,25 @@ export class FoundryLanguageModelChatProviderFactory {
                 }
             };
 
-            // Register with VS Code's Language Model API
-            this.registration = vscode.lm.registerChatModelProvider(
+            // Check if the API is available
+            if (!(vscode as any).lm || !(vscode as any).lm.registerChatModelProvider) {
+                this.logger.warn('Language Model API not available, skipping registration');
+                return vscode.Disposable.from();
+            }
+
+            // Register with VS Code's Language Model API using type assertion
+            this.registration = (vscode as any).lm.registerChatModelProvider(
                 'foundry-local',
                 this.provider as any, // Type assertion needed due to API version differences
                 metadata
             );
 
             this.logger.info('Successfully registered Foundry Language Model Chat Provider');
-            return this.registration;
+            return this.registration || vscode.Disposable.from();
         } catch (error) {
             this.logger.error('Failed to register Language Model Chat Provider', error as Error);
-            throw error;
+            // Return empty disposable instead of throwing to avoid breaking extension activation
+            return vscode.Disposable.from();
         }
     }
 
