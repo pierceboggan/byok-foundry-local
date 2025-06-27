@@ -45,7 +45,17 @@ export class FoundryLocalService {
      * Creates and configures the Foundry Local Manager
      */
     private createFoundryManager(): FoundryLocalManager {
-        return new FoundryLocalManager();
+        const manager = new FoundryLocalManager();
+        this.logger.debug('Created FoundryLocalManager');
+        
+        // Log the endpoint being used
+        try {
+            this.logger.debug(`SDK using endpoint: ${manager.endpoint}`);
+        } catch (error) {
+            this.logger.debug('SDK endpoint not yet available');
+        }
+        
+        return manager;
     }
 
     /**
@@ -107,10 +117,12 @@ export class FoundryLocalService {
             this.logger.debug('Checking Foundry Local service status');
             
             const isRunning = await this.foundryManager.isServiceRunning();
+            this.logger.debug(`SDK reports service running: ${isRunning}`);
             
             if (isRunning) {
                 // Get loaded models count
                 const loadedModels = await this.foundryManager.listLoadedModels();
+                this.logger.debug(`SDK reports ${loadedModels.length} loaded models`);
                 
                 this.status = {
                     isRunning: true,
@@ -199,14 +211,31 @@ export class FoundryLocalService {
      */
     public async discoverModels(): Promise<FoundryLocalModel[]> {
         try {
-            this.logger.debug('Discovering models from Foundry Local');
+            this.logger.info('Discovering models from Foundry Local');
+            
+            // Test direct connection first
+            await this.debugDirectConnection();
+            
+            // Log the SDK configuration details
+            try {
+                this.logger.info(`SDK endpoint: ${this.foundryManager.endpoint}`);
+                this.logger.info(`SDK API key: ${this.foundryManager.apiKey ? '[REDACTED]' : 'NOT SET'}`);
+            } catch (error) {
+                this.logger.info('Failed to get SDK configuration:', error);
+            }
             
             // Get both catalog and loaded models
-            const [catalogModels, loadedModels] = await Promise.all([
-                this.foundryManager.listCatalogModels(),
-                this.foundryManager.listLoadedModels()
-            ]);
+            this.logger.info('Calling SDK listCatalogModels()...');
+            const catalogModels = await this.foundryManager.listCatalogModels();
+            this.logger.info(`SDK listCatalogModels() returned ${catalogModels.length} models`);
+            
+            this.logger.info('Calling SDK listLoadedModels()...');
+            const loadedModels = await this.foundryManager.listLoadedModels();
+            this.logger.info(`SDK listLoadedModels() returned ${loadedModels.length} models`);
 
+            this.logger.info(`SDK catalog models:`, catalogModels.map(m => ({ id: m.id, alias: m.alias })));
+            this.logger.info(`SDK loaded models:`, loadedModels.map(m => ({ id: m.id, alias: m.alias })));
+            
             // Create a set of loaded model IDs for quick lookup
             const loadedModelIds = new Set(loadedModels.map(m => m.id));
 
@@ -216,6 +245,7 @@ export class FoundryLocalService {
             );
 
             this.logger.info(`Discovered ${models.length} models from Foundry Local (${loadedModels.length} loaded)`);
+            this.logger.info('Final converted models:', models.map(m => `${m.id} (loaded: ${m.isLoaded})`));
             return models;
         } catch (error) {
             this.logger.error('Failed to discover models', error as Error);
@@ -350,6 +380,30 @@ export class FoundryLocalService {
         } catch (error) {
             this.logger.error(`Failed to unload model: ${modelId}`, error as Error);
             throw new Error(`Failed to unload model: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Debug method to test direct HTTP connection to Foundry Local
+     */
+    public async debugDirectConnection(): Promise<void> {
+        try {
+            const config = this.configManager.getConfiguration();
+            this.logger.info(`Config: endpoint=${config.endpoint}, port=${config.port}`);
+            const baseUrl = `${config.endpoint}:${config.port}`;
+            
+            this.logger.info(`Testing direct connection to ${baseUrl}`);
+            
+            // Test if we can reach the service directly
+            const response = await fetch(`${baseUrl}/v1/models`);
+            if (response.ok) {
+                const data = await response.json();
+                this.logger.info('Direct HTTP call to /v1/models successful:', data);
+            } else {
+                this.logger.info(`Direct HTTP call failed with status: ${response.status} ${response.statusText}`);
+            }
+        } catch (error) {
+            this.logger.info('Direct HTTP connection test failed:', error);
         }
     }
 }
