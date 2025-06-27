@@ -88,12 +88,15 @@ export class ModelDiscovery {
 
             // Check service status first
             const status = await this.foundryService.checkServiceStatus();
+            this.logger.debug('Service status check result:', status);
+            
             if (!status.isConnected) {
                 throw new Error('Foundry Local service is not available');
             }
 
             // Discover models
             const discoveredModels = await this.foundryService.discoverModels();
+            this.logger.debug('Discovered models:', discoveredModels);
             
             // Update the models list
             this.models = discoveredModels;

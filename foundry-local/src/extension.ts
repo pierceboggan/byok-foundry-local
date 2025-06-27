@@ -175,12 +175,77 @@ Foundry Local Status:
 		}
 	);
 
+	// Debug command to test configuration and connection
+	const debugCommand = vscode.commands.registerCommand(
+		COMMANDS.DEBUG,
+		async () => {
+			try {
+				logger.info('=== FOUNDRY LOCAL DEBUG INFO ===');
+				
+				// Check configuration
+				const config = configManager.getConfiguration();
+				const apiUrl = configManager.getApiUrl();
+				logger.info('Configuration:', config);
+				logger.info('API URL:', apiUrl);
+				
+				// Test service connection
+				logger.info('Testing service connection...');
+				const status = await foundryService.checkServiceStatus();
+				logger.info('Service status:', status);
+				
+				// Try to discover models
+				if (status.isConnected) {
+					logger.info('Attempting to discover models...');
+					try {
+						const models = await foundryService.discoverModels();
+						logger.info(`Discovered ${models.length} models:`, models);
+						
+						// Check model discovery cache
+						const cachedModels = modelDiscovery.getModels();
+						logger.info(`Cached models: ${cachedModels.length}`);
+						
+						// Try to register models
+						logger.info('Attempting to register language model providers...');
+						const disposables = chatProviderFactory.registerModelProviders();
+						logger.info(`Registered ${disposables.length} language model providers`);
+						
+					} catch (modelError) {
+						logger.error('Model discovery failed:', modelError as Error);
+					}
+				}
+				
+				logger.info('=== DEBUG INFO COMPLETE ===');
+				
+				// Show a summary to the user
+				const message = `Debug complete. Check the Foundry Local logs for detailed information.
+				
+Configuration:
+• Endpoint: ${config.endpoint}
+• Port: ${config.port}
+• API URL: ${apiUrl}
+• Service Connected: ${status.isConnected}
+• Models Available: ${status.isConnected ? 'Check logs' : 'N/A'}`;
+				
+				vscode.window.showInformationMessage(message, 'View Logs').then(selection => {
+					if (selection === 'View Logs') {
+						logger.show();
+					}
+				});
+				
+			} catch (error) {
+				logger.error('Debug command failed', error as Error);
+				vscode.window.showErrorMessage(`Debug failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			}
+		}
+	);
+
 	// Add commands to context
 	context.subscriptions.push(
 		refreshModelsCommand,
 		selectModelCommand,
 		showStatusCommand,
-		openSettingsCommand
+		openSettingsCommand,
+		debugCommand
 	);
 
 	logger.info('Registered all extension commands');
@@ -286,13 +351,20 @@ async function autoStartServices() {
 		
 		// Check service status
 		const status = await foundryService.checkServiceStatus();
+		logger.debug('Auto-start service status check:', status);
 		
 		if (status.isConnected) {
 			// Refresh models if service is available
+			logger.info('Service is connected, refreshing models...');
 			await modelDiscovery.refreshModels();
 			logger.info('Auto-start completed successfully');
 		} else {
 			logger.warn('Foundry Local service is not available for auto-start');
+			logger.debug('Service status details:', { 
+				isRunning: status.isRunning, 
+				isConnected: status.isConnected, 
+				error: status.error 
+			});
 		}
 	} catch (error) {
 		logger.error('Auto-start failed', error as Error);

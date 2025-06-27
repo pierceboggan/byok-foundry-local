@@ -49,6 +49,11 @@
         "command": "foundry-local.openSettings",
         "title": "Open Settings",
         "category": "Foundry Local"
+      },
+      {
+        "command": "foundry-local.debug",
+        "title": "Debug Connection",
+        "category": "Foundry Local"
       }
     ],
     "configuration": {

@@ -375,6 +375,8 @@ export class FoundryLocalChatProviderFactory {
         const disposables: vscode.Disposable[] = [];
         const models = this.modelDiscovery.getModels();
         
+        this.logger.debug(`Attempting to register ${models.length} models as language model providers`);
+        
         for (const model of models) {
             const disposable = this.registerModelProvider(model);
             if (disposable) {
@@ -391,8 +393,11 @@ export class FoundryLocalChatProviderFactory {
      */
     private registerModelProvider(model: FoundryLocalModel): vscode.Disposable | undefined {
         try {
+            this.logger.debug(`Attempting to register model: ${model.name} (${model.id})`);
+            
             // Skip if already registered
             if (this.registeredModels.has(model.id)) {
+                this.logger.debug(`Model ${model.id} already registered, skipping`);
                 return undefined;
             }
 
@@ -419,6 +424,8 @@ export class FoundryLocalChatProviderFactory {
                 }
             };
 
+            this.logger.debug(`Registering model ${model.id} with metadata:`, metadata);
+
             // Register with VS Code
             const disposable = vscode.lm.registerChatModelProvider(
                 model.id,
@@ -427,7 +434,7 @@ export class FoundryLocalChatProviderFactory {
             );
 
             this.registeredModels.set(model.id, { provider, disposable });
-            this.logger.debug(`Registered language model provider for model: ${model.name} (${model.id})`);
+            this.logger.debug(`Successfully registered language model provider for model: ${model.name} (${model.id})`);
             
             return disposable;
         } catch (error) {

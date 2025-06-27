@@ -158,5 +158,6 @@ export const COMMANDS = {
     START_SERVICE: 'foundry-local.startService',
     STOP_SERVICE: 'foundry-local.stopService',
     SHOW_STATUS: 'foundry-local.showStatus',
-    OPEN_SETTINGS: 'foundry-local.openSettings'
+    OPEN_SETTINGS: 'foundry-local.openSettings',
+    DEBUG: 'foundry-local.debug'
 } as const;

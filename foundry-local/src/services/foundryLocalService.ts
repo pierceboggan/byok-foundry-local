@@ -81,18 +81,20 @@ export class FoundryLocalService {
         try {
             this.logger.debug('Checking Foundry Local service status');
             
-            // Try to ping the health endpoint
-            const response = await this.axiosInstance.get('/health', { timeout: 5000 });
+            // Try to ping the models endpoint since health might not exist
+            const response = await this.axiosInstance.get('/v1/models', { timeout: 5000 });
+            
+            const modelsCount = response.data?.data?.length || 0;
             
             this.status = {
                 isRunning: true,
                 isConnected: response.status === 200,
                 version: response.data?.version,
-                modelsLoaded: response.data?.modelsLoaded || 0,
+                modelsLoaded: modelsCount,
                 lastChecked: new Date()
             };
 
-            this.logger.info('Foundry Local service is available');
+            this.logger.debug('Foundry Local service status check successful:', this.status);
         } catch (error) {
             this.logger.debug('Foundry Local service check failed:', error);
             
@@ -124,30 +126,36 @@ export class FoundryLocalService {
             
             const response = await this.axiosInstance.get('/v1/models');
             const modelsData = response.data;
+            
+            this.logger.debug('Raw models response:', modelsData);
 
             if (!modelsData?.data || !Array.isArray(modelsData.data)) {
                 throw new Error('Invalid response format from models endpoint');
             }
 
-            const models: FoundryLocalModel[] = modelsData.data.map((model: any) => ({
-                id: model.id,
-                name: model.name || model.id,
-                description: model.description,
-                provider: model.provider || 'foundry-local',
-                capabilities: {
-                    chat: model.capabilities?.chat !== false,
-                    completion: model.capabilities?.completion !== false,
-                    vision: model.capabilities?.vision || false,
-                    toolCalling: model.capabilities?.toolCalling || false,
-                    streaming: model.capabilities?.streaming !== false
-                },
-                maxTokens: model.max_tokens,
-                contextLength: model.context_length,
-                isLoaded: model.loaded !== false,
-                isDefault: model.is_default || false
-            }));
+            const models: FoundryLocalModel[] = modelsData.data.map((model: any) => {
+                this.logger.debug('Processing model:', model);
+                
+                return {
+                    id: model.id,
+                    name: model.display_name || model.id,
+                    description: model.description,
+                    provider: model.owned_by || 'foundry-local',
+                    capabilities: {
+                        chat: true, // Assume chat capability for all models
+                        completion: true, // Assume completion capability for all models
+                        vision: model.vision === true,
+                        toolCalling: model.toolCalling === true,
+                        streaming: true // Assume streaming capability for all models
+                    },
+                    maxTokens: model.maxOutputTokens || 2048,
+                    contextLength: model.maxInputTokens || 4096,
+                    isLoaded: true, // If model is in the list, assume it's loaded
+                    isDefault: false
+                };
+            });
 
-            this.logger.info(`Discovered ${models.length} models from Foundry Local`);
+            this.logger.info(`Discovered ${models.length} models from Foundry Local:`, models.map(m => ({ id: m.id, name: m.name })));
             return models;
         } catch (error) {
             this.logger.error('Failed to discover models', error as Error);

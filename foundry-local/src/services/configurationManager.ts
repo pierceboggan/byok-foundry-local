@@ -32,13 +32,16 @@ export class ConfigurationManager {
     public getConfiguration(): FoundryLocalConfig {
         const config = vscode.workspace.getConfiguration();
         
-        return {
+        const result = {
             endpoint: config.get<string>(CONFIG_KEYS.ENDPOINT) || DEFAULT_CONFIG.endpoint,
             port: config.get<number>(CONFIG_KEYS.PORT) || DEFAULT_CONFIG.port,
             apiKey: config.get<string>(CONFIG_KEYS.API_KEY),
             timeout: config.get<number>(CONFIG_KEYS.TIMEOUT) || DEFAULT_CONFIG.timeout,
             maxRetries: config.get<number>(CONFIG_KEYS.MAX_RETRIES) || DEFAULT_CONFIG.maxRetries
         };
+        
+        this.logger.debug('Current configuration:', result);
+        return result;
     }
 
     /**
@@ -46,7 +49,13 @@ export class ConfigurationManager {
      */
     public getApiUrl(): string {
         const config = this.getConfiguration();
-        return `${config.endpoint}:${config.port}`;
+        
+        // Remove trailing slash from endpoint if present
+        const cleanEndpoint = config.endpoint.replace(/\/$/, '');
+        const apiUrl = `${cleanEndpoint}:${config.port}`;
+        
+        this.logger.debug(`Using API URL: ${apiUrl}`);
+        return apiUrl;
     }
 
     /**
