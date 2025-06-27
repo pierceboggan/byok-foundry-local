@@ -91,7 +91,12 @@
         },
         "foundryLocal.logLevel": {
           "type": "string",
-          "enum": ["debug", "info", "warn", "error"],
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ],
           "default": "info",
           "description": "Log level for Foundry Local extension"
         }
@@ -127,6 +132,7 @@
   },
   "dependencies": {
     "axios": "^1.10.0",
+    "foundry-local-sdk": "^0.3.1",
     "openai": "^5.8.1"
   }
 }
