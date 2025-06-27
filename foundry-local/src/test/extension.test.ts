@@ -2,6 +2,7 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { TokenCounter } from '../utils/tokenCounter';
 import { ConfigurationManager } from '../services/configurationManager';
+import { FoundryLocalService } from '../services/foundryLocalService';
 import { Logger, LogLevel } from '../utils/logger';
 
 suite('Extension Test Suite', () => {
@@ -74,5 +75,32 @@ suite('Extension Test Suite', () => {
 		assert.ok(config.port > 0, 'Should have a valid port number');
 		assert.ok(config.timeout > 0, 'Should have a positive timeout');
 		assert.ok(config.maxRetries >= 0, 'Should have non-negative max retries');
+	});
+
+	test('FoundryLocalService singleton works correctly', () => {
+		const service1 = FoundryLocalService.getInstance();
+		const service2 = FoundryLocalService.getInstance();
+		
+		assert.strictEqual(service1, service2, 'FoundryLocalService should be a singleton');
+	});
+
+	test('FoundryLocalService initializes without errors', () => {
+		const service = FoundryLocalService.getInstance();
+		
+		// Should be able to get status without throwing
+		const status = service.getStatus();
+		assert.ok(typeof status.isRunning === 'boolean', 'Status should have isRunning boolean');
+		assert.ok(typeof status.isConnected === 'boolean', 'Status should have isConnected boolean');
+		assert.ok(typeof status.modelsLoaded === 'number', 'Status should have modelsLoaded number');
+		assert.ok(status.lastChecked instanceof Date, 'Status should have lastChecked Date');
+	});
+
+	test('FoundryLocalService updateConfiguration works', () => {
+		const service = FoundryLocalService.getInstance();
+		
+		// Should be able to update configuration without throwing
+		assert.doesNotThrow(() => {
+			service.updateConfiguration();
+		}, 'updateConfiguration should not throw');
 	});
 });

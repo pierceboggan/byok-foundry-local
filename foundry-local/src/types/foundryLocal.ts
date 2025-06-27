@@ -13,15 +13,24 @@ export interface FoundryLocalConfig {
 
 /**
  * Foundry Local model information
+ * Extended from SDK's FoundryModelInfo with additional UI properties
  */
 export interface FoundryLocalModel {
     id: string;
     name: string;
+    alias: string;
     description?: string;
     provider: string;
+    publisher: string;
+    version: string;
     capabilities: ModelCapabilities;
     maxTokens?: number;
     contextLength?: number;
+    modelSize: number;
+    task: string;
+    license: string;
+    uri: string;
+    promptTemplate: Record<string, string>;
     isLoaded: boolean;
     isDefault?: boolean;
 }
