@@ -1,68 +1,44 @@
-"use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.FoundryLocalChatProviderFactory = exports.FoundryLocalChatProvider = void 0;
-const vscode = __importStar(require("vscode"));
-const foundryLocalService_1 = require("../services/foundryLocalService");
-const modelDiscovery_1 = require("./modelDiscovery");
-const logger_1 = require("../utils/logger");
+import * as vscode from 'vscode';
+import { FoundryLocalModel, FoundryChatMessage } from '../types/foundryLocal';
+import { FoundryLocalService } from '../services/foundryLocalService';
+import { ModelDiscovery } from './modelDiscovery';
+import { Logger } from '../utils/logger';
+
 /**
  * A chat participant implementation for Foundry Local
  */
-class FoundryLocalChatProvider {
-    logger = logger_1.Logger.getInstance();
-    foundryService = foundryLocalService_1.FoundryLocalService.getInstance();
-    modelDiscovery = modelDiscovery_1.ModelDiscovery.getInstance();
-    participant;
+export class FoundryLocalChatProvider {
+    private logger = Logger.getInstance();
+    private foundryService = FoundryLocalService.getInstance();
+    private modelDiscovery = ModelDiscovery.getInstance();
+    private participant: vscode.ChatParticipant;
+
     constructor() {
         this.logger.info('Creating Foundry Local chat participant');
+        
         // Create the chat participant
         this.participant = vscode.chat.createChatParticipant('foundry-local', this.handleChatRequest.bind(this));
         this.participant.iconPath = new vscode.ThemeIcon('robot');
     }
+
     /**
      * Gets the VS Code chat participant
      */
-    getParticipant() {
+    public getParticipant(): vscode.ChatParticipant {
         return this.participant;
     }
+
     /**
      * Handle chat requests from VS Code
      */
-    async handleChatRequest(request, context, response, token) {
+    private async handleChatRequest(
+        request: vscode.ChatRequest,
+        context: vscode.ChatContext,
+        response: vscode.ChatResponseStream,
+        token: vscode.CancellationToken
+    ): Promise<vscode.ChatResult | void> {
         this.logger.debug('Handling chat request', { prompt: request.prompt });
+
         try {
             // Get the default model or use the one specified
             const defaultModel = this.getDefaultModel();
@@ -70,54 +46,66 @@ class FoundryLocalChatProvider {
                 response.markdown('❌ No Foundry Local model is available. Please ensure Foundry Local is running and models are loaded.');
                 return;
             }
+
             this.logger.debug(`Using model: ${defaultModel.name} (${defaultModel.id})`);
+
             // Check if model is loaded
             if (!defaultModel.isLoaded) {
                 response.markdown(`❌ Model ${defaultModel.name} is not loaded. Please load the model first using the \"Foundry Local: Select Model\" command.`);
                 return;
             }
+
             // Create messages for the language model
             const messages = this.createMessagesFromContext(request, context);
+
             // Send the chat request via Foundry Local
             await this.sendChatRequest(messages, response, token, defaultModel);
-        }
-        catch (error) {
-            this.logger.error('Error handling chat request', error);
-            response.markdown(`❌ Error: ${error.message}`);
+
+        } catch (error) {
+            this.logger.error('Error handling chat request', error as Error);
+            response.markdown(`❌ Error: ${(error as Error).message}`);
         }
     }
+
     /**
      * Get the default model to use for chat
      */
-    getDefaultModel() {
+    private getDefaultModel(): FoundryLocalModel | undefined {
         const models = this.modelDiscovery.getModels();
+        
         // First try to get the configured default model
-        const defaultModelId = vscode.workspace.getConfiguration('foundryLocal').get('defaultModel');
+        const defaultModelId = vscode.workspace.getConfiguration('foundryLocal').get<string>('defaultModel');
         if (defaultModelId) {
             const defaultModel = models.find(m => m.id === defaultModelId);
             if (defaultModel && defaultModel.isLoaded) {
                 return defaultModel;
             }
         }
+
         // Fall back to the first loaded model
         const loadedModel = models.find(m => m.isLoaded);
         if (loadedModel) {
             return loadedModel;
         }
+
         // Return the first available model even if not loaded
         return models.length > 0 ? models[0] : undefined;
     }
+
     /**
      * Create messages from the chat context
      */
-    createMessagesFromContext(request, context) {
-        const messages = [];
+    private createMessagesFromContext(
+        request: vscode.ChatRequest,
+        context: vscode.ChatContext
+    ): vscode.LanguageModelChatMessage[] {
+        const messages: vscode.LanguageModelChatMessage[] = [];
+
         // Add conversation history
         for (const turn of context.history) {
             if (turn instanceof vscode.ChatRequestTurn) {
                 messages.push(vscode.LanguageModelChatMessage.User(turn.prompt));
-            }
-            else if (turn instanceof vscode.ChatResponseTurn) {
+            } else if (turn instanceof vscode.ChatResponseTurn) {
                 // Convert response to text
                 const responseText = turn.response.map(part => {
                     if (part instanceof vscode.ChatResponseMarkdownPart) {
@@ -125,23 +113,32 @@ class FoundryLocalChatProvider {
                     }
                     return '';
                 }).join('');
+                
                 if (responseText.trim()) {
                     messages.push(vscode.LanguageModelChatMessage.Assistant(responseText));
                 }
             }
         }
+
         // Add the current user message
         messages.push(vscode.LanguageModelChatMessage.User(request.prompt));
+
         return messages;
     }
+
     /**
      * Send chat request to Foundry Local and stream the response
      */
-    async sendChatRequest(messages, response, token, model) {
+    private async sendChatRequest(
+        messages: vscode.LanguageModelChatMessage[],
+        response: vscode.ChatResponseStream,
+        token: vscode.CancellationToken,
+        model: FoundryLocalModel
+    ): Promise<void> {
         try {
             // Convert VS Code messages to Foundry messages
-            const foundryMessages = messages.map(msg => ({
-                role: msg.role,
+            const foundryMessages: FoundryChatMessage[] = messages.map(msg => ({
+                role: msg.role as 'user' | 'assistant' | 'system',
                 content: typeof msg.content === 'string' ? msg.content : msg.content.map(part => {
                     if (part instanceof vscode.LanguageModelTextPart) {
                         return part.value;
@@ -149,66 +146,77 @@ class FoundryLocalChatProvider {
                     return '';
                 }).join('')
             }));
+
             // Stream the response
-            await this.foundryService.streamChatRequest(foundryMessages, model, (chunk) => {
-                // Check for cancellation
-                if (token.isCancellationRequested) {
-                    return;
+            await this.foundryService.streamChatRequest(
+                foundryMessages,
+                model,
+                (chunk: string) => {
+                    // Check for cancellation
+                    if (token.isCancellationRequested) {
+                        return;
+                    }
+                    // Stream chunk to VS Code
+                    response.markdown(chunk);
+                },
+                (chatResponse) => {
+                    this.logger.debug('Chat request completed', {
+                        model: model.id,
+                        usage: chatResponse.usage
+                    });
+                },
+                (error) => {
+                    this.logger.error('Error in chat stream', error);
+                    response.markdown(`\n\n❌ Error: ${error.message}`);
                 }
-                // Stream chunk to VS Code
-                response.markdown(chunk);
-            }, (chatResponse) => {
-                this.logger.debug('Chat request completed', {
-                    model: model.id,
-                    usage: chatResponse.usage
-                });
-            }, (error) => {
-                this.logger.error('Error in chat stream', error);
-                response.markdown(`\n\n❌ Error: ${error.message}`);
-            });
-        }
-        catch (error) {
-            this.logger.error('Failed to send chat request', error);
-            response.markdown(`❌ Error: ${error.message}`);
+            );
+        } catch (error) {
+            this.logger.error('Failed to send chat request', error as Error);
+            response.markdown(`❌ Error: ${(error as Error).message}`);
         }
     }
+
     /**
      * Dispose the chat provider
      */
-    dispose() {
+    public dispose(): void {
         this.participant.dispose();
         this.logger.info('Disposed Foundry Local chat provider');
     }
 }
-exports.FoundryLocalChatProvider = FoundryLocalChatProvider;
+
 /**
  * Factory class for creating and managing the chat participant
  */
-class FoundryLocalChatProviderFactory {
-    static instance;
-    logger = logger_1.Logger.getInstance();
-    chatProvider;
-    constructor() { }
-    static getInstance() {
+export class FoundryLocalChatProviderFactory {
+    private static instance: FoundryLocalChatProviderFactory;
+    private logger = Logger.getInstance();
+    private chatProvider: FoundryLocalChatProvider | undefined;
+
+    private constructor() {}
+
+    public static getInstance(): FoundryLocalChatProviderFactory {
         if (!FoundryLocalChatProviderFactory.instance) {
             FoundryLocalChatProviderFactory.instance = new FoundryLocalChatProviderFactory();
         }
         return FoundryLocalChatProviderFactory.instance;
     }
+
     /**
      * Creates or gets the chat participant
      */
-    getProvider() {
+    public getProvider(): FoundryLocalChatProvider {
         if (!this.chatProvider) {
             this.chatProvider = new FoundryLocalChatProvider();
             this.logger.info('Created Foundry Local chat provider');
         }
         return this.chatProvider;
     }
+
     /**
      * Dispose the chat provider
      */
-    dispose() {
+    public dispose(): void {
         if (this.chatProvider) {
             this.chatProvider.dispose();
             this.chatProvider = undefined;
@@ -216,5 +224,3 @@ class FoundryLocalChatProviderFactory {
         }
     }
 }
-exports.FoundryLocalChatProviderFactory = FoundryLocalChatProviderFactory;
-//# sourceMappingURL=foundryLocalChatProvider.js.map

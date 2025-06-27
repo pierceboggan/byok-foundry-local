@@ -1,30 +1,152 @@
 {
   "name": "foundry-local",
-  "displayName": "foundry-local",
-  "description": "Use Foundry Local models in VS c VS Code",
+  "displayName": "Foundry Local",
+  "description": "Use Foundry Local models in VS Code with Chat and Language Model integration",
   "version": "0.0.1",
+  "publisher": "foundry-local",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pierceboggan/byok-foundry-local.git"
+  },
   "engines": {
     "vscode": "^1.101.0"
   },
   "categories": [
+    "AI",
+    "Chat",
     "Other"
   ],
-  "activationEvents": [],
+  "keywords": [
+    "foundry",
+    "local",
+    "ai",
+    "chat",
+    "language model",
+    "llm"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "foundry-local.helloWorld",
-        "title": "Hello World"
+        "title": "Hello World",
+        "category": "Foundry Local"
+      },
+      {
+        "command": "foundry-local.refreshModels",
+        "title": "Refresh Models",
+        "category": "Foundry Local",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "foundry-local.selectModel",
+        "title": "Select Model",
+        "category": "Foundry Local",
+        "icon": "$(selection)"
+      },
+      {
+        "command": "foundry-local.loadModel",
+        "title": "Load Model",
+        "category": "Foundry Local",
+        "icon": "$(play)"
+      },
+      {
+        "command": "foundry-local.unloadModel",
+        "title": "Unload Model",
+        "category": "Foundry Local",
+        "icon": "$(stop)"
+      },
+      {
+        "command": "foundry-local.openSettings",
+        "title": "Open Settings",
+        "category": "Foundry Local",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "foundry-local.showStatus",
+        "title": "Show Status",
+        "category": "Foundry Local",
+        "icon": "$(info)"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Foundry Local",
+      "properties": {
+        "foundryLocal.endpoint": {
+          "type": "string",
+          "default": "http://localhost",
+          "description": "Foundry Local endpoint URL"
+        },
+        "foundryLocal.port": {
+          "type": "number",
+          "default": 8080,
+          "description": "Foundry Local port number"
+        },
+        "foundryLocal.timeout": {
+          "type": "number",
+          "default": 30000,
+          "description": "Request timeout in milliseconds"
+        },
+        "foundryLocal.maxRetries": {
+          "type": "number",
+          "default": 3,
+          "description": "Maximum number of request retries"
+        },
+        "foundryLocal.defaultModel": {
+          "type": "string",
+          "description": "Default model to use for chat"
+        },
+        "foundryLocal.debug": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable debug logging"
+        },
+        "foundryLocal.logLevel": {
+          "type": "string",
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ],
+          "default": "info",
+          "description": "Log level for the extension"
+        }
+      }
+    },
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "foundry-local.refreshModels"
+        },
+        {
+          "command": "foundry-local.selectModel"
+        },
+        {
+          "command": "foundry-local.loadModel"
+        },
+        {
+          "command": "foundry-local.unloadModel"
+        },
+        {
+          "command": "foundry-local.openSettings"
+        },
+        {
+          "command": "foundry-local.showStatus"
+        }
+      ]
+    }
   },
+  "extensionDependencies": [],
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src",
+    "lint": "eslint src --ext ts",
     "test": "vscode-test"
   },
   "devDependencies": {
@@ -37,5 +159,8 @@
     "typescript": "^5.8.3",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.5.2"
-  }
+  },
+  "enabledApiProposals": [
+    "chatProvider"
+  ]
 }

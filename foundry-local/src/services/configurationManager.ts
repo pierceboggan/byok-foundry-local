@@ -1,159 +1,139 @@
-"use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.ConfigurationManager = void 0;
-const vscode = __importStar(require("vscode"));
-const logger_1 = require("../utils/logger");
+import * as vscode from 'vscode';
+import { FoundryLocalConfiguration, ConfigurationValidation } from '../types/foundryLocal';
+import { Logger } from '../utils/logger';
+
 /**
  * Manages extension configuration
  */
-class ConfigurationManager {
-    static instance;
-    logger = logger_1.Logger.getInstance();
-    constructor() { }
-    static getInstance() {
+export class ConfigurationManager {
+    private static instance: ConfigurationManager;
+    private logger = Logger.getInstance();
+
+    private constructor() {}
+
+    public static getInstance(): ConfigurationManager {
         if (!ConfigurationManager.instance) {
             ConfigurationManager.instance = new ConfigurationManager();
         }
         return ConfigurationManager.instance;
     }
+
     /**
      * Gets the current configuration
      */
-    getConfiguration() {
+    public getConfiguration(): FoundryLocalConfiguration {
         const config = vscode.workspace.getConfiguration('foundryLocal');
+        
         return {
-            endpoint: config.get('endpoint', 'http://localhost'),
-            port: config.get('port', 8080),
-            timeout: config.get('timeout', 30000),
-            maxRetries: config.get('maxRetries', 3),
-            defaultModel: config.get('defaultModel'),
-            debug: config.get('debug', false),
-            logLevel: config.get('logLevel', 'info')
+            endpoint: config.get<string>('endpoint', 'http://localhost'),
+            port: config.get<number>('port', 8080),
+            timeout: config.get<number>('timeout', 30000),
+            maxRetries: config.get<number>('maxRetries', 3),
+            defaultModel: config.get<string>('defaultModel'),
+            debug: config.get<boolean>('debug', false),
+            logLevel: config.get<'debug' | 'info' | 'warn' | 'error'>('logLevel', 'info')
         };
     }
+
     /**
      * Gets the log level from configuration
      */
-    getLogLevel() {
+    public getLogLevel(): string {
         const config = vscode.workspace.getConfiguration('foundryLocal');
-        return config.get('logLevel', 'info');
+        return config.get<string>('logLevel', 'info');
     }
+
     /**
      * Sets the default model
      */
-    async setDefaultModel(modelId) {
+    public async setDefaultModel(modelId: string): Promise<void> {
         const config = vscode.workspace.getConfiguration('foundryLocal');
         await config.update('defaultModel', modelId, vscode.ConfigurationTarget.Global);
         this.logger.info(`Default model set to: ${modelId}`);
     }
+
     /**
      * Gets the Foundry Local endpoint URL
      */
-    getEndpointUrl() {
+    public getEndpointUrl(): string {
         const config = this.getConfiguration();
         return `${config.endpoint}:${config.port}`;
     }
+
     /**
      * Validates the current configuration
      */
-    validateConfiguration() {
+    public validateConfiguration(): ConfigurationValidation {
         const config = this.getConfiguration();
-        const errors = [];
-        const warnings = [];
+        const errors: string[] = [];
+        const warnings: string[] = [];
+
         // Validate endpoint
         if (!config.endpoint) {
             errors.push('Endpoint URL is required');
-        }
-        else {
+        } else {
             try {
                 new URL(`${config.endpoint}:${config.port}`);
-            }
-            catch (error) {
+            } catch (error) {
                 errors.push('Invalid endpoint URL format');
             }
         }
+
         // Validate port
         if (!config.port || config.port < 1 || config.port > 65535) {
             errors.push('Port must be between 1 and 65535');
         }
+
         // Validate timeout
         if (config.timeout < 1000) {
             warnings.push('Timeout is very low (< 1 second)');
-        }
-        else if (config.timeout > 300000) {
+        } else if (config.timeout > 300000) {
             warnings.push('Timeout is very high (> 5 minutes)');
         }
+
         // Validate max retries
         if (config.maxRetries < 0) {
             errors.push('Max retries cannot be negative');
-        }
-        else if (config.maxRetries > 10) {
+        } else if (config.maxRetries > 10) {
             warnings.push('Max retries is very high (> 10)');
         }
+
         return {
             isValid: errors.length === 0,
             errors,
             warnings
         };
     }
+
     /**
      * Updates a configuration value
      */
-    async updateConfiguration(key, value) {
+    public async updateConfiguration(key: keyof FoundryLocalConfiguration, value: any): Promise<void> {
         const config = vscode.workspace.getConfiguration('foundryLocal');
         await config.update(key, value, vscode.ConfigurationTarget.Global);
         this.logger.info(`Configuration updated: ${key} = ${value}`);
     }
+
     /**
      * Resets configuration to defaults
      */
-    async resetConfiguration() {
+    public async resetConfiguration(): Promise<void> {
         const config = vscode.workspace.getConfiguration('foundryLocal');
-        const keys = [
+        const keys: (keyof FoundryLocalConfiguration)[] = [
             'endpoint', 'port', 'timeout', 'maxRetries', 'defaultModel', 'debug', 'logLevel'
         ];
+
         for (const key of keys) {
             await config.update(key, undefined, vscode.ConfigurationTarget.Global);
         }
+
         this.logger.info('Configuration reset to defaults');
     }
+
     /**
      * Watches for configuration changes
      */
-    onConfigurationChanged(callback) {
+    public onConfigurationChanged(callback: (config: FoundryLocalConfiguration) => void): vscode.Disposable {
         return vscode.workspace.onDidChangeConfiguration(event => {
             if (event.affectsConfiguration('foundryLocal')) {
                 this.logger.debug('Configuration changed');
@@ -162,5 +142,3 @@ class ConfigurationManager {
         });
     }
 }
-exports.ConfigurationManager = ConfigurationManager;
-//# sourceMappingURL=configurationManager.js.map

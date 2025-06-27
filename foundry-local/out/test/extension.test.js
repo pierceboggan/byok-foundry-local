@@ -34,15 +34,95 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const assert = __importStar(require("assert"));
-// You can import and use all API from the 'vscode' module
-// as well as import your extension to test it
 const vscode = __importStar(require("vscode"));
-// import * as myExtension from '../../extension';
+const tokenCounter_1 = require("../utils/tokenCounter");
+const configurationManager_1 = require("../services/configurationManager");
+const logger_1 = require("../utils/logger");
 suite('Extension Test Suite', () => {
     vscode.window.showInformationMessage('Start all tests.');
-    test('Sample test', () => {
-        assert.strictEqual(-1, [1, 2, 3].indexOf(5));
-        assert.strictEqual(-1, [1, 2, 3].indexOf(0));
+    test('TokenCounter estimates tokens correctly', () => {
+        const text = 'Hello world, this is a test message.';
+        const tokens = tokenCounter_1.TokenCounter.estimateTokens(text);
+        // Should estimate roughly text.length / 4 tokens
+        assert.ok(tokens > 0, 'Token count should be greater than 0');
+        assert.ok(tokens < text.length, 'Token count should be less than character count');
+    });
+    test('TokenCounter formats token counts correctly', () => {
+        assert.strictEqual(tokenCounter_1.TokenCounter.formatTokenCount(500), '500 tokens');
+        assert.strictEqual(tokenCounter_1.TokenCounter.formatTokenCount(1500), '1.5K tokens');
+        assert.strictEqual(tokenCounter_1.TokenCounter.formatTokenCount(1500000), '1.5M tokens');
+    });
+    test('TokenCounter checks token limits correctly', () => {
+        const shortText = 'Hello';
+        const longText = 'This is a much longer text that would exceed token limits';
+        assert.ok(tokenCounter_1.TokenCounter.isWithinLimit(shortText, 100), 'Short text should be within limit');
+        assert.ok(!tokenCounter_1.TokenCounter.isWithinLimit(longText, 2), 'Long text should exceed small limit');
+    });
+    test('Logger singleton works correctly', () => {
+        const logger1 = logger_1.Logger.getInstance();
+        const logger2 = logger_1.Logger.getInstance();
+        assert.strictEqual(logger1, logger2, 'Logger should be a singleton');
+    });
+    test('Logger levels work correctly', () => {
+        const logger = logger_1.Logger.getInstance();
+        // Test setting different log levels
+        logger.setLogLevel(logger_1.LogLevel.DEBUG);
+        logger.setLogLevel(logger_1.LogLevel.INFO);
+        logger.setLogLevel(logger_1.LogLevel.WARN);
+        logger.setLogLevel(logger_1.LogLevel.ERROR);
+        // If we get here without errors, the log levels are working
+        assert.ok(true, 'Log levels should be settable');
+    });
+    test('ConfigurationManager singleton works correctly', () => {
+        const config1 = configurationManager_1.ConfigurationManager.getInstance();
+        const config2 = configurationManager_1.ConfigurationManager.getInstance();
+        assert.strictEqual(config1, config2, 'ConfigurationManager should be a singleton');
+    });
+    test('ConfigurationManager validates configuration', () => {
+        const configManager = configurationManager_1.ConfigurationManager.getInstance();
+        const validation = configManager.validateConfiguration();
+        // Should have a validation result with isValid and errors properties
+        assert.ok(typeof validation.isValid === 'boolean', 'Validation should return isValid boolean');
+        assert.ok(Array.isArray(validation.errors), 'Validation should return errors array');
+    });
+    test('Default configuration values are reasonable', () => {
+        const configManager = configurationManager_1.ConfigurationManager.getInstance();
+        const config = configManager.getConfiguration();
+        assert.ok(config.endpoint, 'Should have a default endpoint');
+        assert.ok(config.port > 0, 'Should have a valid port number');
+        assert.ok(config.timeout > 0, 'Should have a positive timeout');
+        assert.ok(config.maxRetries >= 0, 'Should have non-negative max retries');
+    });
+    test('TokenCounter estimates messages correctly', () => {
+        const messages = [
+            { role: 'user', content: 'Hello' },
+            { role: 'assistant', content: 'Hi there!' }
+        ];
+        const tokens = tokenCounter_1.TokenCounter.estimateTokensForMessages(messages);
+        assert.ok(tokens > 0, 'Message token count should be greater than 0');
+        assert.ok(tokens >= 8, 'Should include overhead for message structure'); // At least some overhead
+    });
+    test('TokenCounter truncates text correctly', () => {
+        const longText = 'This is a very long text that should be truncated when it exceeds the token limit';
+        const truncated = tokenCounter_1.TokenCounter.truncateToTokenLimit(longText, 5); // Very small limit
+        assert.ok(truncated.length < longText.length, 'Text should be truncated');
+        assert.ok(truncated.includes('...'), 'Truncated text should include ellipsis');
+    });
+    test('Extension commands are registered', async () => {
+        // Test if extension commands are available
+        const commands = await vscode.commands.getCommands();
+        const foundryCommands = [
+            'foundry-local.helloWorld',
+            'foundry-local.refreshModels',
+            'foundry-local.selectModel',
+            'foundry-local.loadModel',
+            'foundry-local.unloadModel',
+            'foundry-local.openSettings',
+            'foundry-local.showStatus'
+        ];
+        for (const command of foundryCommands) {
+            assert.ok(commands.includes(command), `Command ${command} should be registered`);
+        }
     });
 });
 //# sourceMappingURL=extension.test.js.map
