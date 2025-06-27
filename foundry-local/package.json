@@ -6,7 +6,9 @@
   "engines": {
     "vscode": "^1.101.0"
   },
-  "enableProposedApi": true,
+  "enabledApiProposals": [
+    "chatProvider"
+  ],
   "categories": [
     "AI",
     "Chat",
@@ -94,7 +96,14 @@
           "description": "Log level for Foundry Local extension"
         }
       }
-    }
+    },
+    "chatParticipants": [
+      {
+        "id": "foundry-local",
+        "name": "foundry-local",
+        "description": "Chat with your local AI models through Foundry Local"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

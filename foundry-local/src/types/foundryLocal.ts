@@ -153,10 +153,10 @@ export const DEFAULT_CONFIG: FoundryLocalConfig = {
  * Command identifiers for the extension
  */
 export const COMMANDS = {
-    REFRESH_MODELS: 'foundryLocal.refreshModels',
-    SELECT_MODEL: 'foundryLocal.selectModel',
-    START_SERVICE: 'foundryLocal.startService',
-    STOP_SERVICE: 'foundryLocal.stopService',
-    SHOW_STATUS: 'foundryLocal.showStatus',
-    OPEN_SETTINGS: 'foundryLocal.openSettings'
+    REFRESH_MODELS: 'foundry-local.refreshModels',
+    SELECT_MODEL: 'foundry-local.selectModel',
+    START_SERVICE: 'foundry-local.startService',
+    STOP_SERVICE: 'foundry-local.stopService',
+    SHOW_STATUS: 'foundry-local.showStatus',
+    OPEN_SETTINGS: 'foundry-local.openSettings'
 } as const;
