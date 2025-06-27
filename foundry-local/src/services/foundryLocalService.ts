@@ -29,7 +29,9 @@ export class FoundryLocalService {
         };
 
         this.foundryManager = this.createFoundryManager();
-        this.updateOpenAIClient();
+        this.updateOpenAI().catch(error => {
+            this.logger.warn('Failed to initialize OpenAI client during construction:', error);
+        });
     }
 
     public static getInstance(): FoundryLocalService {
@@ -49,19 +51,41 @@ export class FoundryLocalService {
     /**
      * Creates and configures the OpenAI client for chat completions
      */
-    private updateOpenAIClient(): void {
-        try {
-            const config = this.configManager.getConfiguration();
-            const baseURL = `${config.endpoint}:${config.port}/v1`;
-            
-            this.openaiClient = new OpenAI({
-                baseURL: baseURL,
-                apiKey: config.apiKey || 'sk-no-key-required',
-            });
-        } catch (error) {
-            this.logger.warn('Failed to initialize OpenAI client:', error);
-            this.openaiClient = null;
-        }
+    private updateOpenAI(): Promise<void> {
+        return new Promise((resolve) => {
+            try {
+                const config = this.configManager.getConfiguration();
+                let baseURL: string;
+                
+                // Try to use SDK endpoint if available, otherwise fall back to configuration
+                try {
+                    baseURL = this.foundryManager.endpoint;
+                } catch {
+                    // SDK not initialized yet, use configuration
+                    baseURL = `${config.endpoint}:${config.port}/v1`;
+                }
+                
+                let apiKey: string;
+                try {
+                    apiKey = this.foundryManager.apiKey;
+                } catch {
+                    // SDK not initialized yet, use configuration
+                    apiKey = config.apiKey || 'sk-no-key-required';
+                }
+                
+                this.openaiClient = new OpenAI({
+                    baseURL: baseURL,
+                    apiKey: apiKey,
+                });
+                
+                this.logger.debug('OpenAI client initialized', { baseURL });
+                resolve();
+            } catch (error) {
+                this.logger.warn('Failed to initialize OpenAI client:', error);
+                this.openaiClient = null;
+                resolve();
+            }
+        });
     }
 
     /**
@@ -69,7 +93,9 @@ export class FoundryLocalService {
      */
     public updateConfiguration(): void {
         this.foundryManager = this.createFoundryManager();
-        this.updateOpenAIClient();
+        this.updateOpenAI().catch(error => {
+            this.logger.warn('Failed to update OpenAI client:', error);
+        });
         this.logger.info('Foundry Local service configuration updated');
     }
 
@@ -116,6 +142,18 @@ export class FoundryLocalService {
         }
 
         return this.status;
+    }
+
+    /**
+     * Ensures the OpenAI client is ready for use
+     */
+    private async ensureOpenAIClient(): Promise<void> {
+        if (!this.openaiClient) {
+            await this.updateOpenAI();
+            if (!this.openaiClient) {
+                throw new Error('OpenAI client could not be initialized. Check service configuration and ensure Foundry Local is running.');
+            }
+        }
     }
 
     /**
@@ -192,11 +230,9 @@ export class FoundryLocalService {
         try {
             this.logger.debug('Sending chat request to Foundry Local', { model: request.model, messageCount: request.messages.length });
             
-            if (!this.openaiClient) {
-                throw new Error('OpenAI client not initialized. Check service configuration.');
-            }
+            await this.ensureOpenAIClient();
 
-            const response = await this.openaiClient.chat.completions.create({
+            const response = await this.openaiClient!.chat.completions.create({
                 model: request.model,
                 messages: request.messages as any,
                 max_tokens: request.max_tokens,
@@ -248,11 +284,9 @@ export class FoundryLocalService {
         try {
             this.logger.debug('Sending streaming chat request to Foundry Local', { model: request.model });
             
-            if (!this.openaiClient) {
-                throw new Error('OpenAI client not initialized. Check service configuration.');
-            }
+            await this.ensureOpenAIClient();
 
-            const stream = await this.openaiClient.chat.completions.create({
+            const stream = await this.openaiClient!.chat.completions.create({
                 model: request.model,
                 messages: request.messages as any,
                 max_tokens: request.max_tokens,

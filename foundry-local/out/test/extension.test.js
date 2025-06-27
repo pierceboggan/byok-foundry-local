@@ -37,6 +37,7 @@ const assert = __importStar(require("assert"));
 const vscode = __importStar(require("vscode"));
 const tokenCounter_1 = require("../utils/tokenCounter");
 const configurationManager_1 = require("../services/configurationManager");
+const foundryLocalService_1 = require("../services/foundryLocalService");
 const logger_1 = require("../utils/logger");
 suite('Extension Test Suite', () => {
     vscode.window.showInformationMessage('Start all tests.');
@@ -92,6 +93,27 @@ suite('Extension Test Suite', () => {
         assert.ok(config.port > 0, 'Should have a valid port number');
         assert.ok(config.timeout > 0, 'Should have a positive timeout');
         assert.ok(config.maxRetries >= 0, 'Should have non-negative max retries');
+    });
+    test('FoundryLocalService singleton works correctly', () => {
+        const service1 = foundryLocalService_1.FoundryLocalService.getInstance();
+        const service2 = foundryLocalService_1.FoundryLocalService.getInstance();
+        assert.strictEqual(service1, service2, 'FoundryLocalService should be a singleton');
+    });
+    test('FoundryLocalService initializes without errors', () => {
+        const service = foundryLocalService_1.FoundryLocalService.getInstance();
+        // Should be able to get status without throwing
+        const status = service.getStatus();
+        assert.ok(typeof status.isRunning === 'boolean', 'Status should have isRunning boolean');
+        assert.ok(typeof status.isConnected === 'boolean', 'Status should have isConnected boolean');
+        assert.ok(typeof status.modelsLoaded === 'number', 'Status should have modelsLoaded number');
+        assert.ok(status.lastChecked instanceof Date, 'Status should have lastChecked Date');
+    });
+    test('FoundryLocalService updateConfiguration works', () => {
+        const service = foundryLocalService_1.FoundryLocalService.getInstance();
+        // Should be able to update configuration without throwing
+        assert.doesNotThrow(() => {
+            service.updateConfiguration();
+        }, 'updateConfiguration should not throw');
     });
 });
 //# sourceMappingURL=extension.test.js.map
