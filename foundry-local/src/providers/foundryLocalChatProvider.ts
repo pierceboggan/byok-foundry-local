@@ -172,6 +172,7 @@ export class FoundryLocalChatProvider {
      */
     private getDefaultModel(): FoundryLocalModel | undefined {
         const models = this.modelDiscovery.getModels();
+        this.logger.debug(`Chat provider found ${models.length} models:`, models.map(m => `${m.id} (loaded: ${m.isLoaded})`));
         
         // First try to get the configured default model
         const defaultModelId = vscode.workspace.getConfiguration('foundryLocal').get<string>('defaultModel');

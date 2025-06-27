@@ -2,6 +2,7 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { TokenCounter } from '../utils/tokenCounter';
 import { ConfigurationManager } from '../services/configurationManager';
+import { FoundryLocalService } from '../services/foundryLocalService';
 import { Logger, LogLevel } from '../utils/logger';
 import { FoundryLocalLanguageModelProvider } from '../providers/foundryLocalChatProvider';
 

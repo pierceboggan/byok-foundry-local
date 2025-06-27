@@ -30,6 +30,7 @@ export class ModelDiscovery {
      * Gets the currently cached models
      */
     public getModels(): FoundryLocalModel[] {
+        this.logger.debug(`ModelDiscovery returning ${this.models.length} cached models:`, this.models.map(m => `${m.id} (loaded: ${m.isLoaded})`));
         return [...this.models];
     }
 
@@ -76,12 +77,15 @@ export class ModelDiscovery {
      * Refreshes the models list from Foundry Local
      */
     public async refreshModels(): Promise<FoundryLocalModel[]> {
+        this.logger.debug(`refreshModels called, refreshInProgress: ${this.refreshInProgress}`);
+        
         if (this.refreshInProgress) {
             this.logger.debug('Model refresh already in progress, skipping');
             return this.models;
         }
 
         this.refreshInProgress = true;
+        this.logger.debug('Starting model refresh...');
 
         try {
             this.logger.info('Refreshing models from Foundry Local');
@@ -103,6 +107,7 @@ export class ModelDiscovery {
             this.lastRefresh = new Date();
 
             this.logger.info(`Refreshed ${this.models.length} models`);
+            this.logger.debug('Cached models after refresh:', this.models.map(m => `${m.id} (loaded: ${m.isLoaded})`));
 
             // Notify listeners
             this.onModelsChangedEmitter.fire(this.models);
