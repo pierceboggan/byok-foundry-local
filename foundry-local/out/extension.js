@@ -90,11 +90,16 @@ function activate(context) {
     }
     // Add disposables to context
     context.subscriptions.push(logger, configManager, modelDiscovery);
+    // Add chat provider factory cleanup
+    context.subscriptions.push({
+        dispose: () => chatProviderFactory.dispose()
+    });
     logger.info('Foundry Local extension activated successfully');
 }
 // This method is called when your extension is deactivated
 function deactivate() {
     logger?.info('Foundry Local extension is being deactivated');
+    chatProviderFactory?.dispose();
 }
 /**
  * Registers all extension commands
@@ -175,20 +180,16 @@ Foundry Local Status:
  */
 function registerChatProvider(context) {
     try {
-        // Check if the language model API is available
-        // This is a proposed API that may not be available in all VS Code versions
-        if (typeof vscode.lm !== 'undefined' && typeof vscode.lm.registerChatModelProvider === 'function') {
-            logger.info('Language Model API is available, registering Foundry Local chat provider');
-            // Register chat provider (this would be the actual implementation when the API is stable)
-            // For now, we'll just log that it's available
-            logger.info('Chat provider registration would happen here when API is stable');
-        }
-        else {
-            logger.info('Language Model API is not available in this VS Code version');
-        }
+        // Create and register the chat participant
+        logger.info('Registering Foundry Local chat participant');
+        const chatProvider = chatProviderFactory.getProvider();
+        const participant = chatProvider.getParticipant();
+        // Add the participant to the context subscriptions so it gets disposed properly
+        context.subscriptions.push(participant);
+        logger.info('Foundry Local chat participant registered successfully');
     }
     catch (error) {
-        logger.error('Failed to register chat provider', error);
+        logger.error('Failed to register chat participant', error);
     }
 }
 /**
@@ -198,8 +199,6 @@ function setupModelDiscoveryEvents() {
     // Listen for model changes
     modelDiscovery.onModelsChanged(models => {
         logger.info(`Models updated: ${models.length} models available`);
-        // Update chat providers
-        chatProviderFactory.updateAllProviders();
         // Show notification if no models are loaded
         const loadedModels = models.filter(m => m.isLoaded);
         if (models.length > 0 && loadedModels.length === 0) {

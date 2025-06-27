@@ -6,6 +6,7 @@
   "engines": {
     "vscode": "^1.101.0"
   },
+  "enableProposedApi": true,
   "categories": [
     "AI",
     "Chat",

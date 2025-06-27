@@ -2,170 +2,92 @@ import * as vscode from 'vscode';
 import { FoundryLocalModel, FoundryChatMessage } from '../types/foundryLocal';
 import { FoundryLocalService } from '../services/foundryLocalService';
 import { ModelDiscovery } from './modelDiscovery';
-import { TokenCounter } from '../utils/tokenCounter';
 import { Logger } from '../utils/logger';
 
 /**
- * Type definitions for the proposed VS Code Language Model API
- * These may not be available in all VS Code versions
+ * A chat participant implementation for Foundry Local
  */
-interface LanguageModelTextPart {
-    kind: 'text';
-    text: string;
-}
-
-interface LanguageModelToolCallPart {
-    kind: 'toolCall';
-    callId: string;
-    name: string;
-    parameters: any;
-}
-
-interface LanguageModelToolResultPart {
-    kind: 'toolResult';
-    callId: string;
-    content: string;
-}
-
-type LanguageModelChatMessagePart = LanguageModelTextPart | LanguageModelToolCallPart | LanguageModelToolResultPart;
-
-interface LanguageModelChatMessage {
-    role: 'user' | 'assistant';
-    content: LanguageModelChatMessagePart[];
-    name?: string;
-}
-
-interface LanguageModelChatRequest {
-    messages: LanguageModelChatMessage[];
-    options: LanguageModelChatRequestOptions;
-}
-
-interface LanguageModelChatRequestOptions {
-    justification?: string;
-}
-
-interface LanguageModelChatResponse {
-    text: AsyncIterable<string>;
-}
-
-interface LanguageModelCountTokensRequest {
-    text: string;
-}
-
-interface LanguageModelCountTokensResponse {
-    tokenCount: number;
-}
-
-/**
- * Interface for the proposed LanguageModelChatProvider2
- */
-interface LanguageModelChatProvider2 {
-    provideChatResponse(
-        messages: LanguageModelChatMessage[],
-        options: LanguageModelChatRequestOptions,
-        token: vscode.CancellationToken
-    ): Promise<LanguageModelChatResponse>;
-
-    countTokens(
-        request: LanguageModelCountTokensRequest,
-        token: vscode.CancellationToken
-    ): Promise<LanguageModelCountTokensResponse>;
-}
-
-export class FoundryLocalChatProvider implements LanguageModelChatProvider2 {
+export class FoundryLocalChatProvider {
     private logger = Logger.getInstance();
     private foundryService = FoundryLocalService.getInstance();
     private modelDiscovery = ModelDiscovery.getInstance();
+    private participant: vscode.ChatParticipant;
 
-    constructor(private model: FoundryLocalModel) {
-        this.logger.info(`Created chat provider for model: ${model.name} (${model.id})`);
+    constructor() {
+        this.logger.info('Creating Foundry Local chat participant');
+        
+        // Create the chat participant
+        this.participant = vscode.chat.createChatParticipant('foundry-local', this.handleChatRequest.bind(this));
+        this.participant.iconPath = new vscode.ThemeIcon('robot');
     }
 
     /**
-     * Provides chat response using Foundry Local
+     * Handle chat requests from VS Code
      */
-    async provideChatResponse(
-        messages: LanguageModelChatMessage[],
-        options: LanguageModelChatRequestOptions,
+    private async handleChatRequest(
+        request: vscode.ChatRequest,
+        context: vscode.ChatContext,
+        response: vscode.ChatResponseStream,
         token: vscode.CancellationToken
-    ): Promise<LanguageModelChatResponse> {
-        this.logger.debug(`Providing chat response for model: ${this.model.id}`, {
-            messageCount: messages.length,
-            justification: options.justification
-        });
+    ): Promise<vscode.ChatResult | void> {
+        this.logger.debug('Handling chat request', { prompt: request.prompt });
 
-        // Convert VS Code messages to Foundry Local format
-        const foundryMessages = this.convertMessagesToFoundryFormat(messages);
-
-        // Check if model is loaded
-        if (!this.model.isLoaded) {
-            throw new Error(`Model ${this.model.name} is not loaded. Please load the model first.`);
-        }
-
-        // Create the chat request
-        const chatRequest = {
-            model: this.model.id,
-            messages: foundryMessages,
-            stream: true,
-            max_tokens: this.model.maxTokens
-        };
-
-        // Create an async iterable for the response text
-        const textIterable = this.createTextIterable(chatRequest, token);
-
-        return {
-            text: textIterable
-        };
-    }
-
-    /**
-     * Counts tokens in the given text
-     */
-    async countTokens(
-        request: LanguageModelCountTokensRequest,
-        token: vscode.CancellationToken
-    ): Promise<LanguageModelCountTokensResponse> {
-        this.logger.debug(`Counting tokens for model: ${this.model.id}`);
-
-        // Use our token counter utility for estimation
-        const tokenCount = TokenCounter.estimateTokens(request.text);
-
-        return {
-            tokenCount
-        };
-    }
-
-    /**
-     * Converts VS Code chat messages to Foundry Local format
-     */
-    private convertMessagesToFoundryFormat(messages: LanguageModelChatMessage[]): FoundryChatMessage[] {
-        return messages.map(message => {
-            // Extract text content from message parts
-            const textParts = message.content.filter(part => part.kind === 'text') as LanguageModelTextPart[];
-            const content = textParts.map(part => part.text).join('\n');
-
-            return {
-                role: message.role,
-                content,
-                name: message.name
-            };
-        });
-    }
-
-    /**
-     * Creates an async iterable for streaming chat responses
-     */
-    private async* createTextIterable(
-        chatRequest: any,
-        token: vscode.CancellationToken
-    ): AsyncGenerator<string, void, unknown> {
         try {
-            this.logger.debug('Starting streaming chat request');
+            // Get the default model or use the one specified
+            const defaultModel = this.getDefaultModel();
+            if (!defaultModel) {
+                response.markdown('❌ No Foundry Local model is available. Please ensure Foundry Local is running and models are loaded.');
+                return;
+            }
 
+            this.logger.debug(`Using model: ${defaultModel.name} (${defaultModel.id})`);
+
+            // Check if model is loaded
+            if (!defaultModel.isLoaded) {
+                response.markdown(`❌ Model ${defaultModel.name} is not loaded. Please load the model first using the "Foundry Local: Select Model" command.`);
+                return;
+            }
+
+            // Create messages for the language model
+            const messages = this.createMessagesFromContext(request, context);
+
+            // Send the chat request via Foundry Local
+            await this.sendChatRequest(messages, response, token, defaultModel);
+
+        } catch (error) {
+            this.logger.error('Error handling chat request', error as Error);
+            response.markdown(`❌ Error: ${(error as Error).message}`);
+        }
+    }
+
+    /**
+     * Send chat request to Foundry Local and stream the response
+     */
+    private async sendChatRequest(
+        messages: vscode.LanguageModelChatMessage[],
+        response: vscode.ChatResponseStream,
+        token: vscode.CancellationToken,
+        model: FoundryLocalModel
+    ): Promise<void> {
+        try {
+            // Convert VS Code messages to Foundry Local format
+            const foundryMessages = this.convertMessagesToFoundryFormat(messages);
+
+            // Create the chat request
+            const chatRequest = {
+                model: model.id,
+                messages: foundryMessages,
+                stream: true,
+                max_tokens: model.maxTokens
+            };
+
+            this.logger.debug('Sending streaming chat request to Foundry Local');
+
+            // Get the streaming response
             const streamGenerator = this.foundryService.sendStreamingChatRequest(chatRequest);
 
+            // Stream the response back to VS Code
             for await (const chunk of streamGenerator) {
-                // Check for cancellation
                 if (token.isCancellationRequested) {
                     this.logger.debug('Chat request cancelled');
                     return;
@@ -175,7 +97,7 @@ export class FoundryLocalChatProvider implements LanguageModelChatProvider2 {
                 if (chunk.choices && chunk.choices.length > 0) {
                     const choice = chunk.choices[0];
                     if (choice.delta && choice.delta.content) {
-                        yield choice.delta.content;
+                        response.markdown(choice.delta.content);
                     }
                 }
             }
@@ -188,29 +110,110 @@ export class FoundryLocalChatProvider implements LanguageModelChatProvider2 {
     }
 
     /**
-     * Gets the model information
+     * Create messages from the chat context
      */
-    public getModel(): FoundryLocalModel {
-        return this.model;
+    private createMessagesFromContext(
+        request: vscode.ChatRequest,
+        context: vscode.ChatContext
+    ): vscode.LanguageModelChatMessage[] {
+        const messages: vscode.LanguageModelChatMessage[] = [];
+
+        // Add conversation history
+        for (const turn of context.history) {
+            if (turn instanceof vscode.ChatRequestTurn) {
+                messages.push(vscode.LanguageModelChatMessage.User(turn.prompt));
+            } else if (turn instanceof vscode.ChatResponseTurn) {
+                // Convert response to text
+                const responseText = turn.response.map(part => {
+                    if (part instanceof vscode.ChatResponseMarkdownPart) {
+                        return part.value.value;
+                    }
+                    return '';
+                }).join('');
+                
+                if (responseText.trim()) {
+                    messages.push(vscode.LanguageModelChatMessage.Assistant(responseText));
+                }
+            }
+        }
+
+        // Add the current user message
+        messages.push(vscode.LanguageModelChatMessage.User(request.prompt));
+
+        return messages;
     }
 
     /**
-     * Updates the model information
+     * Convert VS Code chat messages to Foundry Local format
      */
-    public updateModel(model: FoundryLocalModel): void {
-        this.model = model;
-        this.logger.debug(`Updated model information: ${model.name} (${model.id})`);
+    private convertMessagesToFoundryFormat(messages: vscode.LanguageModelChatMessage[]): FoundryChatMessage[] {
+        return messages.map(message => {
+            // Extract text content from message content
+            let content = '';
+            
+            if (Array.isArray(message.content)) {
+                const textParts = message.content.filter(part => part instanceof vscode.LanguageModelTextPart) as vscode.LanguageModelTextPart[];
+                content = textParts.map(part => part.value).join('\n');
+            } else {
+                content = message.content as string;
+            }
+
+            return {
+                role: message.role === vscode.LanguageModelChatMessageRole.User ? 'user' : 'assistant',
+                content,
+                name: message.name
+            };
+        });
+    }
+
+    /**
+     * Get the default model to use for chat
+     */
+    private getDefaultModel(): FoundryLocalModel | undefined {
+        const models = this.modelDiscovery.getModels();
+        
+        // First try to get the configured default model
+        const defaultModelId = vscode.workspace.getConfiguration('foundryLocal').get<string>('defaultModel');
+        if (defaultModelId) {
+            const defaultModel = models.find(m => m.id === defaultModelId);
+            if (defaultModel && defaultModel.isLoaded) {
+                return defaultModel;
+            }
+        }
+
+        // Fall back to the first loaded model
+        const loadedModel = models.find(m => m.isLoaded);
+        if (loadedModel) {
+            return loadedModel;
+        }
+
+        // Return the first available model even if not loaded
+        return models.length > 0 ? models[0] : undefined;
+    }
+
+    /**
+     * Get the chat participant instance
+     */
+    public getParticipant(): vscode.ChatParticipant {
+        return this.participant;
+    }
+
+    /**
+     * Dispose the chat participant
+     */
+    public dispose(): void {
+        this.participant.dispose();
+        this.logger.info('Disposed Foundry Local chat participant');
     }
 }
 
 /**
- * Factory class for creating and managing chat providers
+ * Factory class for creating and managing the chat participant
  */
 export class FoundryLocalChatProviderFactory {
     private static instance: FoundryLocalChatProviderFactory;
     private logger = Logger.getInstance();
-    private modelDiscovery = ModelDiscovery.getInstance();
-    private providers = new Map<string, FoundryLocalChatProvider>();
+    private chatProvider: FoundryLocalChatProvider | undefined;
 
     private constructor() {}
 
@@ -222,71 +225,24 @@ export class FoundryLocalChatProviderFactory {
     }
 
     /**
-     * Creates or gets a chat provider for the specified model
+     * Creates or gets the chat participant
      */
-    public getProvider(modelId: string): FoundryLocalChatProvider | undefined {
-        const model = this.modelDiscovery.getModel(modelId);
-        if (!model) {
-            this.logger.warn(`Model not found: ${modelId}`);
-            return undefined;
+    public getProvider(): FoundryLocalChatProvider {
+        if (!this.chatProvider) {
+            this.chatProvider = new FoundryLocalChatProvider();
+            this.logger.info('Created Foundry Local chat provider');
         }
-
-        // Check if we already have a provider for this model
-        let provider = this.providers.get(modelId);
-        if (provider) {
-            // Update the provider with the latest model information
-            provider.updateModel(model);
-            return provider;
-        }
-
-        // Create a new provider
-        provider = new FoundryLocalChatProvider(model);
-        this.providers.set(modelId, provider);
-
-        this.logger.info(`Created new chat provider for model: ${modelId}`);
-        return provider;
+        return this.chatProvider;
     }
 
     /**
-     * Gets all available providers
+     * Dispose the chat provider
      */
-    public getAllProviders(): FoundryLocalChatProvider[] {
-        return Array.from(this.providers.values());
-    }
-
-    /**
-     * Removes a provider
-     */
-    public removeProvider(modelId: string): void {
-        if (this.providers.delete(modelId)) {
-            this.logger.info(`Removed chat provider for model: ${modelId}`);
+    public dispose(): void {
+        if (this.chatProvider) {
+            this.chatProvider.dispose();
+            this.chatProvider = undefined;
+            this.logger.info('Disposed Foundry Local chat provider');
         }
-    }
-
-    /**
-     * Updates all providers with latest model information
-     */
-    public updateAllProviders(): void {
-        const models = this.modelDiscovery.getModels();
-        const modelMap = new Map(models.map(model => [model.id, model]));
-
-        // Update existing providers
-        for (const [modelId, provider] of this.providers) {
-            const updatedModel = modelMap.get(modelId);
-            if (updatedModel) {
-                provider.updateModel(updatedModel);
-            } else {
-                // Model no longer exists, remove the provider
-                this.removeProvider(modelId);
-            }
-        }
-    }
-
-    /**
-     * Clears all providers
-     */
-    public clearProviders(): void {
-        this.providers.clear();
-        this.logger.info('Cleared all chat providers');
     }
 }
