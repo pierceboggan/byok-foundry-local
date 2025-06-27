@@ -204,10 +204,16 @@ Foundry Local Status:
 						const cachedModels = modelDiscovery.getModels();
 						logger.info(`Cached models: ${cachedModels.length}`);
 						
-						// Try to register models
+						// Check currently registered providers
+						const registeredCount = chatProviderFactory.getRegisteredModelsCount();
+						const registeredIds = chatProviderFactory.getRegisteredModelIds();
+						logger.info(`Currently registered language model providers: ${registeredCount}`);
+						logger.info(`Registered model IDs: ${registeredIds.join(', ')}`);
+						
+						// Try to register models (this might be 0 if already registered)
 						logger.info('Attempting to register language model providers...');
 						const disposables = chatProviderFactory.registerModelProviders();
-						logger.info(`Registered ${disposables.length} language model providers`);
+						logger.info(`New registrations attempted: ${disposables.length} (0 means already registered)`);
 						
 					} catch (modelError) {
 						logger.error('Model discovery failed:', modelError as Error);
@@ -217,6 +223,7 @@ Foundry Local Status:
 				logger.info('=== DEBUG INFO COMPLETE ===');
 				
 				// Show a summary to the user
+				const registeredCount = status.isConnected ? chatProviderFactory.getRegisteredModelsCount() : 0;
 				const message = `Debug complete. Check the Foundry Local logs for detailed information.
 				
 Configuration:
@@ -224,7 +231,8 @@ Configuration:
 • Port: ${config.port}
 • API URL: ${apiUrl}
 • Service Connected: ${status.isConnected}
-• Models Available: ${status.isConnected ? 'Check logs' : 'N/A'}`;
+• Models Discovered: ${status.isConnected ? status.modelsLoaded : 'N/A'}
+• Language Model Providers: ${registeredCount}`;
 				
 				vscode.window.showInformationMessage(message, 'View Logs').then(selection => {
 					if (selection === 'View Logs') {

@@ -489,4 +489,18 @@ export class FoundryLocalChatProviderFactory {
 
         this.disposeModelProviders();
     }
+
+    /**
+     * Get the count of currently registered model providers
+     */
+    public getRegisteredModelsCount(): number {
+        return this.registeredModels.size;
+    }
+
+    /**
+     * Get the IDs of currently registered models
+     */
+    public getRegisteredModelIds(): string[] {
+        return Array.from(this.registeredModels.keys());
+    }
 }
