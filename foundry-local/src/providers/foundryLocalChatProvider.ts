@@ -215,9 +215,11 @@ export class FoundryLocalLanguageModelProvider implements vscode.LanguageModelCh
     private logger = Logger.getInstance();
     private foundryService = FoundryLocalService.getInstance();
     private modelDiscovery = ModelDiscovery.getInstance();
+    private modelId: string;
 
-    constructor() {
-        this.logger.info('Creating Foundry Local language model provider');
+    constructor(modelId: string) {
+        this.modelId = modelId;
+        this.logger.info(`Creating Foundry Local language model provider for model: ${modelId}`);
     }
 
     /**
@@ -233,19 +235,14 @@ export class FoundryLocalLanguageModelProvider implements vscode.LanguageModelCh
         this.logger.debug('Providing language model response', { 
             messageCount: messages.length, 
             extensionId,
-            modelId: options.modelOptions?.modelId
+            modelId: this.modelId
         });
 
         try {
             // Find the specified model
-            const modelId = options.modelOptions?.modelId;
-            if (!modelId) {
-                throw new Error('No model specified in request options');
-            }
-
-            const model = this.modelDiscovery.getModel(modelId);
+            const model = this.modelDiscovery.getModel(this.modelId);
             if (!model) {
-                throw new Error(`Model ${modelId} not found`);
+                throw new Error(`Model ${this.modelId} not found`);
             }
 
             if (!model.isLoaded) {
@@ -348,9 +345,8 @@ export class FoundryLocalChatProviderFactory {
     private static instance: FoundryLocalChatProviderFactory;
     private logger = Logger.getInstance();
     private chatProvider: FoundryLocalChatProvider | undefined;
-    private languageModelProvider: FoundryLocalLanguageModelProvider | undefined;
     private modelDiscovery = ModelDiscovery.getInstance();
-    private registeredModels = new Map<string, vscode.Disposable>();
+    private registeredModels = new Map<string, { provider: FoundryLocalLanguageModelProvider, disposable: vscode.Disposable }>();
 
     private constructor() {}
 
@@ -370,17 +366,6 @@ export class FoundryLocalChatProviderFactory {
             this.logger.info('Created Foundry Local chat provider');
         }
         return this.chatProvider;
-    }
-
-    /**
-     * Creates or gets the language model provider
-     */
-    public getLanguageModelProvider(): FoundryLocalLanguageModelProvider {
-        if (!this.languageModelProvider) {
-            this.languageModelProvider = new FoundryLocalLanguageModelProvider();
-            this.logger.info('Created Foundry Local language model provider');
-        }
-        return this.languageModelProvider;
     }
 
     /**
@@ -411,7 +396,8 @@ export class FoundryLocalChatProviderFactory {
                 return undefined;
             }
 
-            const provider = this.getLanguageModelProvider();
+            // Create a new provider instance for this model
+            const provider = new FoundryLocalLanguageModelProvider(model.id);
             
             // Create metadata for this specific model
             const metadata: vscode.ChatResponseProviderMetadata = {
@@ -440,7 +426,7 @@ export class FoundryLocalChatProviderFactory {
                 metadata
             );
 
-            this.registeredModels.set(model.id, disposable);
+            this.registeredModels.set(model.id, { provider, disposable });
             this.logger.debug(`Registered language model provider for model: ${model.name} (${model.id})`);
             
             return disposable;
@@ -454,9 +440,9 @@ export class FoundryLocalChatProviderFactory {
      * Unregister a model provider
      */
     public unregisterModelProvider(modelId: string): void {
-        const disposable = this.registeredModels.get(modelId);
-        if (disposable) {
-            disposable.dispose();
+        const entry = this.registeredModels.get(modelId);
+        if (entry) {
+            entry.disposable.dispose();
             this.registeredModels.delete(modelId);
             this.logger.debug(`Unregistered language model provider for model: ${modelId}`);
         }
@@ -477,8 +463,8 @@ export class FoundryLocalChatProviderFactory {
      * Dispose all model providers
      */
     private disposeModelProviders(): void {
-        for (const [modelId, disposable] of this.registeredModels.entries()) {
-            disposable.dispose();
+        for (const [modelId, entry] of this.registeredModels.entries()) {
+            entry.disposable.dispose();
         }
         this.registeredModels.clear();
         this.logger.debug('Disposed all language model providers');
@@ -495,10 +481,5 @@ export class FoundryLocalChatProviderFactory {
         }
 
         this.disposeModelProviders();
-        
-        if (this.languageModelProvider) {
-            this.languageModelProvider = undefined;
-            this.logger.info('Disposed Foundry Local language model provider');
-        }
     }
 }

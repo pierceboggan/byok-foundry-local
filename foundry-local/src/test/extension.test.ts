@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import { TokenCounter } from '../utils/tokenCounter';
 import { ConfigurationManager } from '../services/configurationManager';
 import { Logger, LogLevel } from '../utils/logger';
+import { FoundryLocalLanguageModelProvider } from '../providers/foundryLocalChatProvider';
 
 suite('Extension Test Suite', () => {
 	vscode.window.showInformationMessage('Start all tests.');
@@ -74,5 +75,18 @@ suite('Extension Test Suite', () => {
 		assert.ok(config.port > 0, 'Should have a valid port number');
 		assert.ok(config.timeout > 0, 'Should have a positive timeout');
 		assert.ok(config.maxRetries >= 0, 'Should have non-negative max retries');
+	});
+
+	test('FoundryLocalLanguageModelProvider can be instantiated', () => {
+		const provider = new FoundryLocalLanguageModelProvider('test-model-id');
+		assert.ok(provider, 'Provider should be instantiated');
+	});
+
+	test('FoundryLocalLanguageModelProvider provides token count for strings', async () => {
+		const provider = new FoundryLocalLanguageModelProvider('test-model-id');
+		const tokenCount = await provider.provideTokenCount('Hello world', new vscode.CancellationTokenSource().token);
+		
+		assert.ok(tokenCount > 0, 'Token count should be greater than 0');
+		assert.ok(typeof tokenCount === 'number', 'Token count should be a number');
 	});
 });
